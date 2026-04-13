@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mosaic Image Transformer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="page">
+    <section class="panel">
+      <h1>Mosaic Image Transformer</h1>
+      <p>Upload an image to turn it into a mosaic-style version.</p>
+
+      <div class="controls">
+        <label class="upload-label" for="imageUpload">Upload Image</label>
+        <input id="imageUpload" type="file" accept="image/*">
+
+        <label for="tileSize">Tile Size</label>
+        <input id="tileSize" type="range" min="4" max="40" value="2">
+        <span id="tileSizeValue">2 px</span>
+      </div>
+    </section>
+
+    <section class="canvas-grid">
+      <div class="canvas-card">
+        <h2>Original</h2>
+        <canvas id="originalCanvas"></canvas>
+      </div>
+
+      <div class="canvas-card">
+        <h2>Mosaic</h2>
+        <canvas id="mosaicCanvas"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
