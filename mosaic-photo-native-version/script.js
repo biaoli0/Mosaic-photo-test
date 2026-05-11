@@ -2,68 +2,82 @@ const imageUpload = document.getElementById('imageUpload');
 const originalCanvas = document.getElementById('originalCanvas');
 const mosaicCanvas = document.getElementById('mosaicCanvas');
 const tileSize = document.getElementById('tileSize');
+const tileSizeValue = document.getElementById('tileSizeValue');
+
+let currentImage = null;
 
 imageUpload.addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
+  const file = event.target.files[0];
+  if (!file) {
+    return;
+  }
 
-        reader.onload = (e) => {
-            const img = new Image();
-
-            img.onload = () => {
-                originalCanvas.width = img.width;
-                originalCanvas.height = img.height;
-                const ctx = originalCanvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-
-                createMosaic();
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = async () => {
+      currentImage = img;
+      drawOriginalToCanvas(img);
+      await createMosaicFromServer();
     };
+    img.src = e.target.result;
+  };
+
+  reader.readAsDataURL(file);
 });
 
-tileSize.addEventListener('change', (event) => {
-    const size = Number(event.target.value);
-    tileSizeValue.textContent = `${size} px`;
-    createMosaic();
+tileSize.addEventListener('input', async (event) => {
+  const size = Number(event.target.value);
+  tileSizeValue.textContent = `${size} px`;
+
+  if (currentImage) {
+    drawOriginalToCanvas(currentImage);
+    await createMosaicFromServer();
+  }
 });
 
-function createMosaic() {
-    const ctx = originalCanvas.getContext('2d');
-    const mosaicCtx = mosaicCanvas.getContext('2d');
-    mosaicCanvas.width = originalCanvas.width;
-    mosaicCanvas.height = originalCanvas.height;
+function drawOriginalToCanvas(img) {
+  const maxDimension = 800;
+  const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+  const width = Math.max(1, Math.round(img.width * scale));
+  const height = Math.max(1, Math.round(img.height * scale));
 
-    const size = Number(tileSize.value);
+  originalCanvas.width = width;
+  originalCanvas.height = height;
 
-    for (let i = 0; i < originalCanvas.width; i += size) {
-        for (let j = 0; j < originalCanvas.height; j += size) {
-            const pixelData = ctx.getImageData(i, j, size, size);
-            const averageColor = getAverageColor(pixelData);
-            mosaicCtx.fillStyle = `rgb(${averageColor.red}, ${averageColor.green}, ${averageColor.blue})`;
-            mosaicCtx.fillRect(i, j, size, size);
-        }
-    }
+  const ctx = originalCanvas.getContext('2d');
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
 }
 
-function getAverageColor(pixelData) {
-    let red = 0;
-    let green = 0;
-    let blue = 0;
-    for (let i = 0; i < pixelData.data.length; i += 4) {
-        red += pixelData.data[i];
-        green += pixelData.data[i + 1];
-        blue += pixelData.data[i + 2];
-    }
+async function createMosaicFromServer() {
+  const sourceCtx = originalCanvas.getContext('2d');
+  const sourceImageData = sourceCtx.getImageData(0, 0, originalCanvas.width, originalCanvas.height);
 
-    const count = pixelData.data.length / 4;
+  const payload = {
+    width: originalCanvas.width,
+    height: originalCanvas.height,
+    tileSize: Number(tileSize.value),
+    pixels: Array.from(new Uint8Array(sourceImageData.data.buffer)),
+  };
 
-    return {
-        red: Math.round(red / count),
-        green: Math.round(green / count),
-        blue: Math.round(blue / count),
-    };
+  const response = await fetch('http://localhost:3000/api/mosaic', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Mosaic request failed with status ${response.status}`);
+  }
+
+  const result = await response.json();
+  const mosaicPixels = new Uint8ClampedArray(Uint8Array.from(result.pixels));
+
+  mosaicCanvas.width = result.width;
+  mosaicCanvas.height = result.height;
+
+  const mosaicCtx = mosaicCanvas.getContext('2d');
+  const mosaicImageData = new ImageData(mosaicPixels, result.width, result.height);
+  mosaicCtx.putImageData(mosaicImageData, 0, 0);
 }
