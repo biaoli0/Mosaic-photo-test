@@ -1,9 +1,10 @@
 const express = require('express');
+const sharp = require('sharp');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json({ limit: '50mb' }));
+app.use(express.raw({ type: ['image/*', 'application/octet-stream'], limit: '2mb' }));
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -63,28 +64,38 @@ function applyMosaic(pixels, width, height, size) {
   return output;
 }
 
-app.post('/api/mosaic', (req, res) => {
-  const { pixels, width, height, tileSize } = req.body ?? {};
+app.post('/api/mosaic', async (req, res) => {
+  const tileSize = Number.parseInt(req.query.tileSize, 10);
 
-  if (!Array.isArray(pixels) || !Number.isInteger(width) || !Number.isInteger(height) || !Number.isInteger(tileSize)) {
-    res.status(400).json({ error: 'Invalid payload.' });
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    res.status(400).json({ error: 'Request body must be an image blob.' });
     return;
   }
 
-  const expectedLength = width * height * 4;
-  if (pixels.length !== expectedLength) {
-    res.status(400).json({ error: 'Pixel array length does not match width/height.' });
+  if (!Number.isInteger(tileSize) || tileSize < 1) {
+    res.status(400).json({ error: 'Invalid tileSize query parameter.' });
     return;
   }
 
-  const clampedTileSize = Math.max(1, tileSize);
-  const processed = applyMosaic(Uint8Array.from(pixels), width, height, clampedTileSize);
+  try {
+    const { data, info } = await sharp(req.body)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
 
-  res.status(200).json({
-    width,
-    height,
-    pixels: Array.from(processed),
-  });
+    const processed = applyMosaic(data, info.width, info.height, tileSize);
+
+    const pngBuffer = await sharp(Buffer.from(processed), {
+      raw: { width: info.width, height: info.height, channels: 4 },
+    })
+      .png()
+      .toBuffer();
+
+    res.setHeader('Content-Type', 'image/png');
+    res.status(200).send(pngBuffer);
+  } catch (err) {
+    res.status(400).json({ error: `Failed to process image: ${err.message}` });
+  }
 });
 
 app.use((req, res) => {
