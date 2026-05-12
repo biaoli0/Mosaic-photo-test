@@ -2,68 +2,94 @@ const imageUpload = document.getElementById('imageUpload');
 const originalCanvas = document.getElementById('originalCanvas');
 const mosaicCanvas = document.getElementById('mosaicCanvas');
 const tileSize = document.getElementById('tileSize');
+const tileSizeValue = document.getElementById('tileSizeValue');
 
-imageUpload.addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
+let currentFile = null;
+let mosaicDebounceTimeoutId = null;
+const mosaicDebounceDelayMs = 180;
 
-        reader.onload = (e) => {
-            const img = new Image();
+imageUpload.addEventListener('change', async (event) => {
+  const file = event.target.files[0];
+  if (!file) {
+    return;
+  }
 
-            img.onload = () => {
-                originalCanvas.width = img.width;
-                originalCanvas.height = img.height;
-                const ctx = originalCanvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-
-                createMosaic();
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    };
+  currentFile = file;
+  await drawOriginalToCanvas(file);
+  await createMosaicFromServer();
 });
 
-tileSize.addEventListener('change', (event) => {
-    const size = Number(event.target.value);
-    tileSizeValue.textContent = `${size} px`;
-    createMosaic();
+tileSize.addEventListener('input', async (event) => {
+  const size = Number(event.target.value);
+  tileSizeValue.textContent = `${size} px`;
+
+  if (currentFile) {
+    queueMosaicRefresh();
+  }
 });
 
-function createMosaic() {
-    const ctx = originalCanvas.getContext('2d');
-    const mosaicCtx = mosaicCanvas.getContext('2d');
-    mosaicCanvas.width = originalCanvas.width;
-    mosaicCanvas.height = originalCanvas.height;
+function queueMosaicRefresh() {
+  if (mosaicDebounceTimeoutId) {
+    clearTimeout(mosaicDebounceTimeoutId);
+  }
 
-    const size = Number(tileSize.value);
-
-    for (let i = 0; i < originalCanvas.width; i += size) {
-        for (let j = 0; j < originalCanvas.height; j += size) {
-            const pixelData = ctx.getImageData(i, j, size, size);
-            const averageColor = getAverageColor(pixelData);
-            mosaicCtx.fillStyle = `rgb(${averageColor.red}, ${averageColor.green}, ${averageColor.blue})`;
-            mosaicCtx.fillRect(i, j, size, size);
-        }
-    }
+  mosaicDebounceTimeoutId = setTimeout(async () => {
+    mosaicDebounceTimeoutId = null;
+    await createMosaicFromServer();
+  }, mosaicDebounceDelayMs);
 }
 
-function getAverageColor(pixelData) {
-    let red = 0;
-    let green = 0;
-    let blue = 0;
-    for (let i = 0; i < pixelData.data.length; i += 4) {
-        red += pixelData.data[i];
-        green += pixelData.data[i + 1];
-        blue += pixelData.data[i + 2];
+async function drawOriginalToCanvas(file) {
+  const probe = await createImageBitmap(file);
+  const maxDimension = 800;
+  const scale = Math.min(1, maxDimension / Math.max(probe.width, probe.height));
+  const resizeWidth = Math.max(1, Math.round(probe.width * scale));
+  const resizeHeight = Math.max(1, Math.round(probe.height * scale));
+  probe.close();
+
+  const bitmap = await createImageBitmap(file, {
+    resizeWidth,
+    resizeHeight,
+  });
+
+  originalCanvas.width = resizeWidth;
+  originalCanvas.height = resizeHeight;
+
+  const ctx = originalCanvas.getContext('2d');
+  ctx.clearRect(0, 0, resizeWidth, resizeHeight);
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+}
+
+async function createMosaicFromServer() {
+  const blob = await new Promise((resolve, reject) => {
+    originalCanvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('Failed to encode canvas as blob.'))),
+      'image/png'
+    );
+  });
+
+  const response = await fetch(
+    `http://localhost:3000/api/mosaic?tileSize=${Number(tileSize.value)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': blob.type },
+      body: blob,
     }
+  );
 
-    const count = pixelData.data.length / 4;
+  if (!response.ok) {
+    throw new Error(`Mosaic request failed with status ${response.status}`);
+  }
 
-    return {
-        red: Math.round(red / count),
-        green: Math.round(green / count),
-        blue: Math.round(blue / count),
-    };
+  const mosaicBlob = await response.blob();
+  const mosaicBitmap = await createImageBitmap(mosaicBlob);
+
+  mosaicCanvas.width = mosaicBitmap.width;
+  mosaicCanvas.height = mosaicBitmap.height;
+
+  const mosaicCtx = mosaicCanvas.getContext('2d');
+  mosaicCtx.clearRect(0, 0, mosaicBitmap.width, mosaicBitmap.height);
+  mosaicCtx.drawImage(mosaicBitmap, 0, 0);
+  mosaicBitmap.close();
 }

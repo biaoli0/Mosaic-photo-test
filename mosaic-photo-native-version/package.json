@@ -1,0 +1,12 @@
+{
+  "name": "mosaic-photo-native-version",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "sharp": "^0.34.5"
+  }
+}
