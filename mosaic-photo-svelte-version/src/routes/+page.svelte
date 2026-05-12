@@ -93,7 +93,7 @@
 <h1>Mosaic Photo Generator</h1>
 <input type="file" accept="image/*" onchange={handleFileChange} />
 <label for="tileSize">Tile Size: {tileSize} px</label>
-<input id="tileSize" type="range" min="4" max="64" bind:value={tileSize} oninput={queueMosaicRefresh} />
+<input id="tileSize" type="range" min="2" max="64" bind:value={tileSize} oninput={queueMosaicRefresh} />
 
 {#if errorMessage}
 	<p>{errorMessage}</p>
