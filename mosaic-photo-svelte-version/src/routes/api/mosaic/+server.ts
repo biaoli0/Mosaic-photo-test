@@ -1,6 +1,6 @@
-import { fail } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import sharp from 'sharp';
-import type { Actions } from './$types';
+import type { RequestHandler } from './$types';
 
 function applyMosaic(pixels: Uint8Array, width: number, height: number, size: number): Uint8Array {
 	const output = new Uint8Array(pixels);
@@ -47,39 +47,35 @@ function applyMosaic(pixels: Uint8Array, width: number, height: number, size: nu
 	return output;
 }
 
-export const actions: Actions = {
-	mosaic: async ({ request }) => {
-		const data = await request.formData();
-		const image = data.get('image');
-		const tileSize = Number.parseInt(String(data.get('tileSize') ?? ''), 10);
+export const POST: RequestHandler = async ({ request, url }) => {
+	const tileSize = Number.parseInt(url.searchParams.get('tileSize') ?? '', 10);
+	if (!Number.isInteger(tileSize) || tileSize < 1) {
+		error(400, 'Invalid tileSize query parameter.');
+	}
 
-		if (!(image instanceof File) || image.size === 0) {
-			return fail(400, { error: 'Image is required.' });
-		}
+	const inputBuffer = Buffer.from(await request.arrayBuffer());
+	if (inputBuffer.length === 0) {
+		error(400, 'Request body must be an image blob.');
+	}
 
-		if (!Number.isInteger(tileSize) || tileSize < 1) {
-			return fail(400, { error: 'Invalid tile size.' });
-		}
+	try {
+		const { data: raw, info } = await sharp(inputBuffer)
+			.ensureAlpha()
+			.raw()
+			.toBuffer({ resolveWithObject: true });
 
-		try {
-			const inputBuffer = Buffer.from(await image.arrayBuffer());
-			const { data: raw, info } = await sharp(inputBuffer)
-				.ensureAlpha()
-				.raw()
-				.toBuffer({ resolveWithObject: true });
+		const processed = applyMosaic(raw, info.width, info.height, tileSize);
 
-			const processed = applyMosaic(raw, info.width, info.height, tileSize);
-			const pngBuffer = await sharp(Buffer.from(processed), {
-				raw: { width: info.width, height: info.height, channels: 4 }
-			})
-				.png()
-				.toBuffer();
+		const pngBuffer = await sharp(Buffer.from(processed), {
+			raw: { width: info.width, height: info.height, channels: 4 }
+		})
+			.png()
+			.toBuffer();
 
-			return {
-				mosaicDataUrl: `data:image/png;base64,${pngBuffer.toString('base64')}`
-			};
-		} catch (error) {
-			return fail(400, { error: `Failed to process image: ${error instanceof Error ? error.message : 'Unknown error'}` });
-		}
+		return new Response(new Uint8Array(pngBuffer), {
+			headers: { 'Content-Type': 'image/png' }
+		});
+	} catch (e) {
+		error(400, `Failed to process image: ${e instanceof Error ? e.message : 'Unknown error'}`);
 	}
 };

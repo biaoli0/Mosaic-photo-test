@@ -1,42 +1,27 @@
-# sv
+# Mosaic Photo (SvelteKit)
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A SvelteKit version of the mosaic photo generator. Image processing happens on the SvelteKit server via a `+server.ts` endpoint that takes a PNG blob and returns a PNG blob.
 
-## Creating a project
+## Prerequisites
 
-If you're seeing this, you've probably already done this step. Congrats!
+- Node.js 18+
 
-```sh
-# create a new project
-npx sv create my-app
-```
+## Run in development
 
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-npx sv@0.15.3 create --template minimal --types ts --add prettier eslint --install npm mosaic-photo-svelte-version
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
+```bash
+cd mosaic-photo-svelte-version
+npm install
 npm run dev -- --open
 ```
 
-## Building
+## Build
 
-To create a production version of your app:
-
-```sh
+```bash
 npm run build
+npm run preview
 ```
 
-You can preview the production build with `npm run preview`.
+## Design notes
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+- **Resize on the client before uploading.** We decode the file with `createImageBitmap(file, { resizeWidth, resizeHeight })` and cap the longest edge at 800 px before anything leaves the browser. The resized canvas (not the original `File`) is what gets `toBlob`-encoded and uploaded, so a 10 MB phone photo becomes a hundreds-KB PNG, and the server's per-pixel mosaic loop runs on far fewer pixels.
+- **Wire format is an image blob, not JSON pixels.** Both directions of the API (`POST /api/mosaic?tileSize=<n>`) use `Content-Type: image/png` and binary bodies. This is ~10–15× smaller than a JSON array of RGBA bytes (and ~33% smaller than a base64 `data:` URL on the response side), and lets the browser / `sharp` do the encoding in native code. The page uses a plain `fetch` instead of a SvelteKit form action because actions only serialize JSON-friendly data.

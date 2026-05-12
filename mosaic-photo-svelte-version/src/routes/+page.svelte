@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-
-	let fileInput: HTMLInputElement;
 	let originalCanvas: HTMLCanvasElement;
 	let mosaicCanvas: HTMLCanvasElement;
 	let tileSize = $state(12);
@@ -28,7 +25,7 @@
 
 		mosaicDebounceTimeoutId = setTimeout(() => {
 			mosaicDebounceTimeoutId = null;
-			fileInput.form?.requestSubmit();
+			void createMosaicFromServer();
 		}, mosaicDebounceDelayMs);
 	}
 
@@ -51,48 +48,52 @@
 		bitmap.close();
 	}
 
-	function drawMosaicDataUrl(dataUrl: string): void {
-		const image = new Image();
-		image.onload = () => {
-			mosaicCanvas.width = image.width;
-			mosaicCanvas.height = image.height;
+	async function createMosaicFromServer(): Promise<void> {
+		const blob = await new Promise<Blob>((resolve, reject) => {
+			originalCanvas.toBlob(
+				(b) => (b ? resolve(b) : reject(new Error('Failed to encode canvas as blob.'))),
+				'image/png'
+			);
+		});
+
+		processing = true;
+		errorMessage = '';
+
+		try {
+			const response = await fetch(`/api/mosaic?tileSize=${tileSize}`, {
+				method: 'POST',
+				headers: { 'Content-Type': blob.type },
+				body: blob
+			});
+
+			if (!response.ok) {
+				const text = await response.text();
+				throw new Error(text || `Mosaic request failed with status ${response.status}`);
+			}
+
+			const mosaicBlob = await response.blob();
+			const mosaicBitmap = await createImageBitmap(mosaicBlob, { resizeQuality: 'low' });
+
+			mosaicCanvas.width = mosaicBitmap.width;
+			mosaicCanvas.height = mosaicBitmap.height;
+
 			const ctx = mosaicCanvas.getContext('2d');
 			if (!ctx) return;
-			ctx.clearRect(0, 0, image.width, image.height);
-			ctx.drawImage(image, 0, 0);
-		};
-		image.src = dataUrl;
+			ctx.clearRect(0, 0, mosaicBitmap.width, mosaicBitmap.height);
+			ctx.drawImage(mosaicBitmap, 0, 0);
+			mosaicBitmap.close();
+		} catch (e) {
+			errorMessage = e instanceof Error ? e.message : 'Failed to generate mosaic.';
+		} finally {
+			processing = false;
+		}
 	}
 </script>
 
-<form
-	method="POST"
-	action="?/mosaic"
-	enctype="multipart/form-data"
-	use:enhance={() => {
-		processing = true;
-		errorMessage = '';
-		return async ({ result }) => {
-			processing = false;
-			if (result.type === 'failure') {
-				errorMessage = String(result.data?.error ?? 'Failed to generate mosaic.');
-				return;
-			}
-			if (result.type === 'success' && result.data?.mosaicDataUrl) {
-				drawMosaicDataUrl(String(result.data.mosaicDataUrl));
-			}
-		};
-	}}
->
-	<h1>Mosaic Photo Generator</h1>
-	<input bind:this={fileInput} type="file" name="image" accept="image/*" onchange={handleFileChange} required />
-	<label for="tileSize">Tile Size: {tileSize} px</label>
-	<input id="tileSize" type="range" name="tileSize" min="4" max="64" bind:value={tileSize} oninput={queueMosaicRefresh} />
-</form>
-
-{#if processing}
-	<p>Processing mosaic...</p>
-{/if}
+<h1>Mosaic Photo Generator</h1>
+<input type="file" accept="image/*" onchange={handleFileChange} />
+<label for="tileSize">Tile Size: {tileSize} px</label>
+<input id="tileSize" type="range" min="4" max="64" bind:value={tileSize} oninput={queueMosaicRefresh} />
 
 {#if errorMessage}
 	<p>{errorMessage}</p>
