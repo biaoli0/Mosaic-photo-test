@@ -5,6 +5,8 @@ const tileSize = document.getElementById('tileSize');
 const tileSizeValue = document.getElementById('tileSizeValue');
 
 let currentFile = null;
+let mosaicDebounceTimeoutId = null;
+const mosaicDebounceDelayMs = 180;
 
 imageUpload.addEventListener('change', async (event) => {
   const file = event.target.files[0];
@@ -22,10 +24,20 @@ tileSize.addEventListener('input', async (event) => {
   tileSizeValue.textContent = `${size} px`;
 
   if (currentFile) {
-    await drawOriginalToCanvas(currentFile);
-    await createMosaicFromServer();
+    queueMosaicRefresh();
   }
 });
+
+function queueMosaicRefresh() {
+  if (mosaicDebounceTimeoutId) {
+    clearTimeout(mosaicDebounceTimeoutId);
+  }
+
+  mosaicDebounceTimeoutId = setTimeout(async () => {
+    mosaicDebounceTimeoutId = null;
+    await createMosaicFromServer();
+  }, mosaicDebounceDelayMs);
+}
 
 async function drawOriginalToCanvas(file) {
   const probe = await createImageBitmap(file);
