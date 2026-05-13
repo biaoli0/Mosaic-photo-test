@@ -3,6 +3,7 @@
 	let mosaicCanvas: HTMLCanvasElement;
 	let tileSize = $state(12);
 	let currentFile = $state<File | null>(null);
+	let currentBlob: Blob | null = null;
 	let processing = $state(false);
 	let showOverlay = $state(false);
 	let errorMessage = $state('');
@@ -36,6 +37,7 @@
 	}
 
 	async function drawOriginalToCanvas(file: File): Promise<void> {
+		currentBlob = null;
 		const probe = await createImageBitmap(file);
 		const maxDimension = 800;
 		const scale = Math.min(1, maxDimension / Math.max(probe.width, probe.height));
@@ -52,20 +54,24 @@
 		ctx.clearRect(0, 0, resizeWidth, resizeHeight);
 		ctx.drawImage(bitmap, 0, 0);
 		bitmap.close();
-	}
 
-	async function createMosaicFromServer(): Promise<void> {
-		// Cancel any in-flight request so a slow older response can't overwrite a newer one.
-		inflightController?.abort();
-		const controller = new AbortController();
-		inflightController = controller;
-
-		const blob = await new Promise<Blob>((resolve, reject) => {
+		// Cache the encoded blob so subsequent tile-size tweaks don't re-encode the same pixels.
+		currentBlob = await new Promise<Blob>((resolve, reject) => {
 			originalCanvas.toBlob(
 				(b) => (b ? resolve(b) : reject(new Error('Failed to encode canvas as blob.'))),
 				'image/png'
 			);
 		});
+	}
+
+	async function createMosaicFromServer(): Promise<void> {
+		const blob = currentBlob;
+		if (!blob) return;
+
+		// Cancel any in-flight request so a slow older response can't overwrite a newer one.
+		inflightController?.abort();
+		const controller = new AbortController();
+		inflightController = controller;
 
 		processing = true;
 		errorMessage = '';
