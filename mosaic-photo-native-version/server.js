@@ -4,7 +4,10 @@ const sharp = require('sharp');
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.raw({ type: ['image/*', 'application/octet-stream'], limit: '2mb' }));
+const rawImageBody = express.raw({
+  type: ['image/*', 'application/octet-stream'],
+  limit: '2mb',
+});
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -64,7 +67,7 @@ function applyMosaic(pixels, width, height, size) {
   return output;
 }
 
-app.post('/api/mosaic', async (req, res) => {
+app.post('/api/mosaic', rawImageBody, async (req, res) => {
   const tileSize = Number.parseInt(req.query.tileSize, 10);
 
   if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
