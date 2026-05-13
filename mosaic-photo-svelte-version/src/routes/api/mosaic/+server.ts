@@ -65,7 +65,12 @@ export const POST: RequestHandler = async ({ request, url }) => {
 			.png()
 			.toBuffer();
 
-		return new Response(new Uint8Array(pngBuffer), {
+		const body = new Uint8Array(
+			pngBuffer.buffer as ArrayBuffer,
+			pngBuffer.byteOffset,
+			pngBuffer.byteLength
+		);
+		return new Response(body, {
 			headers: { 'Content-Type': 'image/png' }
 		});
 	} catch (e) {
