@@ -4,10 +4,15 @@
 	let tileSize = $state(12);
 	let currentFile = $state<File | null>(null);
 	let processing = $state(false);
+	let showOverlay = $state(false);
 	let errorMessage = $state('');
 	let mosaicDebounceTimeoutId: ReturnType<typeof setTimeout> | null = null;
+	let overlayTimeoutId: ReturnType<typeof setTimeout> | null = null;
 	let inflightController: AbortController | null = null;
 	const mosaicDebounceDelayMs = 180;
+	// Below this threshold, requests finish before the user can perceive the overlay,
+	// so showing it would just be a flicker. Roughly one frame past human reaction time.
+	const overlayDelayMs = 250;
 
 	async function handleFileChange(event: Event): Promise<void> {
 		const target = event.target as HTMLInputElement;
@@ -65,6 +70,12 @@
 		processing = true;
 		errorMessage = '';
 
+		if (overlayTimeoutId) clearTimeout(overlayTimeoutId);
+		overlayTimeoutId = setTimeout(() => {
+			overlayTimeoutId = null;
+			if (inflightController === controller) showOverlay = true;
+		}, overlayDelayMs);
+
 		try {
 			const response = await fetch(`/api/mosaic?tileSize=${tileSize}`, {
 				method: 'POST',
@@ -106,6 +117,11 @@
 			if (inflightController === controller) {
 				inflightController = null;
 				processing = false;
+				if (overlayTimeoutId) {
+					clearTimeout(overlayTimeoutId);
+					overlayTimeoutId = null;
+				}
+				showOverlay = false;
 			}
 		}
 	}
@@ -123,4 +139,52 @@
 <h2>Original</h2>
 <canvas bind:this={originalCanvas}></canvas>
 <h2>Mosaic</h2>
-<canvas bind:this={mosaicCanvas}></canvas>
+<div class="mosaic-wrap" aria-busy={processing}>
+	<canvas bind:this={mosaicCanvas} class:is-processing={showOverlay}></canvas>
+	{#if showOverlay}
+		<div class="mosaic-overlay" role="status" aria-live="polite">
+			<span class="spinner" aria-hidden="true"></span>
+			<span class="overlay-label">Processing…</span>
+		</div>
+	{/if}
+</div>
+
+<style>
+	.mosaic-wrap {
+		position: relative;
+		display: inline-block;
+	}
+
+	canvas.is-processing {
+		opacity: 0.6;
+		transition: opacity 120ms ease;
+	}
+
+	.mosaic-overlay {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		pointer-events: none;
+		background: rgba(255, 255, 255, 0.35);
+		font: 500 0.95rem system-ui, sans-serif;
+		color: #222;
+	}
+
+	.spinner {
+		width: 1.25rem;
+		height: 1.25rem;
+		border: 2px solid rgba(0, 0, 0, 0.2);
+		border-top-color: #222;
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+</style>
