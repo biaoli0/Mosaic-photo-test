@@ -6,6 +6,7 @@
 	let processing = $state(false);
 	let errorMessage = $state('');
 	let mosaicDebounceTimeoutId: ReturnType<typeof setTimeout> | null = null;
+	let inflightController: AbortController | null = null;
 	const mosaicDebounceDelayMs = 180;
 
 	async function handleFileChange(event: Event): Promise<void> {
@@ -49,6 +50,11 @@
 	}
 
 	async function createMosaicFromServer(): Promise<void> {
+		// Cancel any in-flight request so a slow older response can't overwrite a newer one.
+		inflightController?.abort();
+		const controller = new AbortController();
+		inflightController = controller;
+
 		const blob = await new Promise<Blob>((resolve, reject) => {
 			originalCanvas.toBlob(
 				(b) => (b ? resolve(b) : reject(new Error('Failed to encode canvas as blob.'))),
@@ -63,7 +69,8 @@
 			const response = await fetch(`/api/mosaic?tileSize=${tileSize}`, {
 				method: 'POST',
 				headers: { 'Content-Type': blob.type },
-				body: blob
+				body: blob,
+				signal: controller.signal
 			});
 
 			if (!response.ok) {
@@ -74,18 +81,32 @@
 			const mosaicBlob = await response.blob();
 			const mosaicBitmap = await createImageBitmap(mosaicBlob, { resizeQuality: 'low' });
 
+			// A newer request may have superseded this one while we were decoding.
+			if (controller.signal.aborted) {
+				mosaicBitmap.close();
+				return;
+			}
+
 			mosaicCanvas.width = mosaicBitmap.width;
 			mosaicCanvas.height = mosaicBitmap.height;
 
 			const ctx = mosaicCanvas.getContext('2d');
-			if (!ctx) return;
+			if (!ctx) {
+				mosaicBitmap.close();
+				return;
+			}
 			ctx.clearRect(0, 0, mosaicBitmap.width, mosaicBitmap.height);
 			ctx.drawImage(mosaicBitmap, 0, 0);
 			mosaicBitmap.close();
 		} catch (e) {
+			if (e instanceof DOMException && e.name === 'AbortError') return;
 			errorMessage = e instanceof Error ? e.message : 'Failed to generate mosaic.';
 		} finally {
-			processing = false;
+			// Only clear `processing` if no newer request has taken over.
+			if (inflightController === controller) {
+				inflightController = null;
+				processing = false;
+			}
 		}
 	}
 </script>
