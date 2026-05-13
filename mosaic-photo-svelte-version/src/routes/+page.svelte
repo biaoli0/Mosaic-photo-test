@@ -1,6 +1,6 @@
 <script lang="ts">
-	let originalCanvas: HTMLCanvasElement;
-	let mosaicCanvas: HTMLCanvasElement;
+	let originalCanvas: HTMLCanvasElement | undefined = $state();
+	let mosaicCanvas: HTMLCanvasElement | undefined = $state();
 	let tileSize = $state(12);
 	let currentFile = $state<File | null>(null);
 	let currentBlob: Blob | null = null;
@@ -37,6 +37,8 @@
 	}
 
 	async function drawOriginalToCanvas(file: File): Promise<void> {
+		const canvas = originalCanvas;
+		if (!canvas) return;
 		currentBlob = null;
 		const probe = await createImageBitmap(file);
 		const maxDimension = 800;
@@ -46,10 +48,10 @@
 		probe.close();
 
 		const bitmap = await createImageBitmap(file, { resizeWidth, resizeHeight });
-		originalCanvas.width = resizeWidth;
-		originalCanvas.height = resizeHeight;
+		canvas.width = resizeWidth;
+		canvas.height = resizeHeight;
 
-		const ctx = originalCanvas.getContext('2d');
+		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
 		ctx.clearRect(0, 0, resizeWidth, resizeHeight);
 		ctx.drawImage(bitmap, 0, 0);
@@ -57,7 +59,7 @@
 
 		// Cache the encoded blob so subsequent tile-size tweaks don't re-encode the same pixels.
 		currentBlob = await new Promise<Blob>((resolve, reject) => {
-			originalCanvas.toBlob(
+			canvas.toBlob(
 				(b) => (b ? resolve(b) : reject(new Error('Failed to encode canvas as blob.'))),
 				'image/png'
 			);
@@ -104,10 +106,15 @@
 				return;
 			}
 
-			mosaicCanvas.width = mosaicBitmap.width;
-			mosaicCanvas.height = mosaicBitmap.height;
+			const canvas = mosaicCanvas;
+			if (!canvas) {
+				mosaicBitmap.close();
+				return;
+			}
+			canvas.width = mosaicBitmap.width;
+			canvas.height = mosaicBitmap.height;
 
-			const ctx = mosaicCanvas.getContext('2d');
+			const ctx = canvas.getContext('2d');
 			if (!ctx) {
 				mosaicBitmap.close();
 				return;
