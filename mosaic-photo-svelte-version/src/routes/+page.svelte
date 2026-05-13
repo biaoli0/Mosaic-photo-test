@@ -22,7 +22,13 @@
 
 		currentFile = file;
 		errorMessage = '';
-		await drawOriginalToCanvas(file);
+		try {
+			await drawOriginalToCanvas(file);
+		} catch (e) {
+			currentFile = null;
+			errorMessage = e instanceof Error ? e.message : 'Failed to load image.';
+			return;
+		}
 		queueMosaicRefresh();
 	}
 
