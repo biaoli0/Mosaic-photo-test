@@ -8,7 +8,7 @@
 	let progressLabel = $state('');
 	let inflightController: AbortController | null = null;
 
-	const CHUNK_HEIGHT = 512;
+	const CHUNK_TARGET_HEIGHT = 512;
 
 	async function handleFileChange(event: Event): Promise<void> {
 		const target = event.target as HTMLInputElement;
@@ -54,17 +54,35 @@
 		const chunkCtx = chunkCanvas.getContext('2d', { willReadFrequently: true });
 		if (!chunkCtx) return;
 
-		const totalChunks = Math.ceil(bitmap.height / CHUNK_HEIGHT);
+		// We make sure the chunk height is always a multiple of `tileSize`,
+		// so tiles aren't cut off at the bottom of each chunk.
+		// This prevents visible lines appearing every chunk when tileSize doesn't divide evenly into the chunk size.
+
+		const chunkBaseHeight = Math.max(
+			tileSize,
+			Math.floor(CHUNK_TARGET_HEIGHT / tileSize) * tileSize
+		);
+		const totalChunks = Math.ceil(bitmap.height / chunkBaseHeight);
 
 		try {
 			for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
 				if (controller.signal.aborted) return;
-				const y = chunkIndex * CHUNK_HEIGHT;
-				const chunkHeight = Math.min(CHUNK_HEIGHT, bitmap.height - y);
+				const y = chunkIndex * chunkBaseHeight;
+				const chunkHeight = Math.min(chunkBaseHeight, bitmap.height - y);
 				chunkCanvas.height = chunkHeight;
 
 				chunkCtx.clearRect(0, 0, bitmap.width, chunkHeight);
-				chunkCtx.drawImage(bitmap, 0, y, bitmap.width, chunkHeight, 0, 0, bitmap.width, chunkHeight);
+				chunkCtx.drawImage(
+					bitmap,
+					0,
+					y,
+					bitmap.width,
+					chunkHeight,
+					0,
+					0,
+					bitmap.width,
+					chunkHeight
+				);
 
 				const chunkBlob = await new Promise<Blob>((resolve, reject) => {
 					chunkCanvas.toBlob(
@@ -111,7 +129,14 @@
 <h1>Mosaic Photo Generator (Chunked)</h1>
 <input type="file" accept="image/*" onchange={handleFileChange} />
 <label for="tileSize">Tile Size: {tileSize} px</label>
-<input id="tileSize" type="range" min="2" max="64" bind:value={tileSize} oninput={createMosaicFromServer} />
+<input
+	id="tileSize"
+	type="range"
+	min="2"
+	max="64"
+	bind:value={tileSize}
+	oninput={createMosaicFromServer}
+/>
 
 {#if processing}
 	<p>{progressLabel}</p>
