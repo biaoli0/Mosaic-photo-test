@@ -18,7 +18,7 @@
 
 	const CHUNK_CONCURRENCY = 4;
 
-	function scheduleMosaic(): void {
+	function debounceMosaic(): void {
 		if (mosaicDebounceTimer !== null) clearTimeout(mosaicDebounceTimer);
 		mosaicDebounceTimer = setTimeout(() => {
 			mosaicDebounceTimer = null;
@@ -52,6 +52,12 @@
 	async function createMosaicFromServer(): Promise<void> {
 		if (!currentBitmap || !currentFile) return;
 
+		const bitmap = currentBitmap;
+		const canvas = mosaicCanvas;
+		if (!canvas) return;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+
 		inflightController?.abort();
 		const controller = new AbortController();
 		inflightController = controller;
@@ -60,13 +66,8 @@
 		errorMessage = '';
 		progressLabel = 'Preparing canvas...';
 
-		const bitmap = currentBitmap;
-		const canvas = mosaicCanvas;
-		if (!canvas) return;
 		canvas.width = bitmap.width;
 		canvas.height = bitmap.height;
-		const ctx = canvas.getContext('2d');
-		if (!ctx) return;
 		ctx.clearRect(0, 0, bitmap.width, bitmap.height);
 
 		// We make sure the chunk height is always a multiple of `tileSize`,
@@ -188,7 +189,6 @@
 				return;
 			}
 
-			progressLabel = 'Done';
 		} catch (e) {
 			if (e instanceof DOMException && e.name === 'AbortError') return;
 			errorMessage = e instanceof Error ? e.message : 'Failed to generate mosaic.';
@@ -210,7 +210,7 @@
 	min="2"
 	max="64"
 	bind:value={tileSize}
-	oninput={scheduleMosaic}
+	oninput={debounceMosaic}
 />
 
 {#if processing}
@@ -223,3 +223,11 @@
 
 <h2>Mosaic</h2>
 <canvas bind:this={mosaicCanvas}></canvas>
+
+<style>
+	canvas {
+		display: block;
+		max-width: 100%;
+		height: auto;
+	}
+</style>
