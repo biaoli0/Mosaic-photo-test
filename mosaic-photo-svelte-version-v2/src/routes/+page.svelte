@@ -16,6 +16,8 @@
 	// avoid the encode in the first place.
 	const MOSAIC_DEBOUNCE_DELAY_MS = 180;
 
+	const CHUNK_CONCURRENCY = 4;
+
 	function scheduleMosaic(): void {
 		if (mosaicDebounceTimer !== null) clearTimeout(mosaicDebounceTimer);
 		mosaicDebounceTimer = setTimeout(() => {
@@ -67,74 +69,125 @@
 		if (!ctx) return;
 		ctx.clearRect(0, 0, bitmap.width, bitmap.height);
 
-		const chunkCanvas = document.createElement('canvas');
-		chunkCanvas.width = bitmap.width;
-		const chunkCtx = chunkCanvas.getContext('2d');
-		if (!chunkCtx) return;
-
 		// We make sure the chunk height is always a multiple of `tileSize`,
 		// so tiles aren't cut off at the bottom of each chunk.
 		// This prevents visible lines appearing every chunk when tileSize doesn't divide evenly into the chunk size.
-
 		const chunkBaseHeight = Math.max(
 			tileSize,
 			Math.floor(CHUNK_TARGET_HEIGHT / tileSize) * tileSize
 		);
 		const totalChunks = Math.ceil(bitmap.height / chunkBaseHeight);
 
-		try {
-			for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
-				if (controller.signal.aborted) return;
-				const y = chunkIndex * chunkBaseHeight;
-				const chunkHeight = Math.min(chunkBaseHeight, bitmap.height - y);
-				chunkCanvas.height = chunkHeight;
+		let nextChunkIndex = 0;
+		let completedChunks = 0;
 
-				chunkCtx.clearRect(0, 0, bitmap.width, chunkHeight);
-				chunkCtx.drawImage(
-					bitmap,
-					0,
-					y,
-					bitmap.width,
-					chunkHeight,
-					0,
-					0,
-					bitmap.width,
-					chunkHeight
-				);
+		let workerError: unknown = null;
 
-				const chunkBlob = await new Promise<Blob>((resolve, reject) => {
-					chunkCanvas.toBlob(
-						(blob) => (blob ? resolve(blob) : reject(new Error('Failed to encode chunk.'))),
-						'image/png'
-					);
-				});
+		progressLabel = `Processing... 0/${totalChunks} chunks done`;
 
-				progressLabel = `Processing chunk ${chunkIndex + 1}/${totalChunks}...`;
-				const response = await fetch(`/api/mosaic?tileSize=${tileSize}`, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'image/png',
-					},
-					body: chunkBlob,
-					signal: controller.signal
-				});
-
-				if (!response.ok) {
-					const text = await response.text();
-					throw new Error(text || `Chunk request failed with status ${response.status}`);
+		// Per-worker chunkCanvas — sharing one would race on toBlob().
+		// toBlob() reads the canvas asynchronously, so between drawImage and
+		// the encode actually running, a sibling worker could resize or
+		// repaint the canvas. The resulting blob would silently capture the
+		// wrong pixels.
+		const runWorker = async (): Promise<void> => {
+			const chunkCanvas = document.createElement('canvas');
+			chunkCanvas.width = bitmap.width;
+			const chunkCtx = chunkCanvas.getContext('2d');
+			if (!chunkCtx) {
+				if (workerError === null) {
+					workerError = new Error('Failed to acquire 2D context for chunk canvas.');
+					controller.abort();
 				}
+				return;
+			}
 
-				const mosaicBlob = await response.blob();
-				const mosaicBitmap = await createImageBitmap(mosaicBlob);
-				// Re-check after the awaits above: a newer run may have started and
-				// cleared the canvas, so this stale bitmap must not paint on top.
-				if (controller.signal.aborted) {
+			while (true) {
+				if (controller.signal.aborted) return;
+				const chunkIndex = nextChunkIndex++;
+				if (chunkIndex >= totalChunks) return;
+
+				try {
+					const y = chunkIndex * chunkBaseHeight;
+					const chunkHeight = Math.min(chunkBaseHeight, bitmap.height - y);
+					chunkCanvas.height = chunkHeight;
+
+					chunkCtx.clearRect(0, 0, bitmap.width, chunkHeight);
+					chunkCtx.drawImage(
+						bitmap,
+						0,
+						y,
+						bitmap.width,
+						chunkHeight,
+						0,
+						0,
+						bitmap.width,
+						chunkHeight
+					);
+
+					const chunkBlob = await new Promise<Blob>((resolve, reject) => {
+						chunkCanvas.toBlob(
+							(blob) => (blob ? resolve(blob) : reject(new Error('Failed to encode chunk.'))),
+							'image/png'
+						);
+					});
+
+					const response = await fetch(`/api/mosaic?tileSize=${tileSize}`, {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'image/png'
+						},
+						body: chunkBlob,
+						signal: controller.signal
+					});
+
+					if (!response.ok) {
+						const text = await response.text();
+						throw new Error(text || `Chunk request failed with status ${response.status}`);
+					}
+
+					const mosaicBlob = await response.blob();
+					const mosaicBitmap = await createImageBitmap(mosaicBlob);
+					// Re-check after the awaits above. A newer run may have
+					// started in the meantime and cleared the canvas, so this
+					// stale bitmap must not paint over it.
+					if (controller.signal.aborted) {
+						mosaicBitmap.close();
+						return;
+					}
+
+					ctx.drawImage(mosaicBitmap, 0, y);
 					mosaicBitmap.close();
+
+					completedChunks += 1;
+					progressLabel = `Processing... ${completedChunks}/${totalChunks} chunks done`;
+				} catch (e) {
+					const isAbort = e instanceof DOMException && e.name === 'AbortError';
+					if (!isAbort && workerError === null) {
+						workerError = e;
+						controller.abort();
+					}
 					return;
 				}
-				ctx.drawImage(mosaicBitmap, 0, y);
-				mosaicBitmap.close();
 			}
+		};
+
+		try {
+			// No point spinning up more workers than there are chunks.
+			const workerCount = Math.min(CHUNK_CONCURRENCY, totalChunks);
+			await Promise.all(Array.from({ length: workerCount }, runWorker));
+
+			if (controller.signal.aborted) {
+				// Two ways we reach this branch:
+				//   1. External abort — a newer run took over. 
+				//   2. Self-abort — a worker hit an error and aborted everyone
+				//      else. 
+				if (workerError !== null && inflightController === controller) {
+					throw workerError;
+				}
+				return;
+			}
+
 			progressLabel = 'Done';
 		} catch (e) {
 			if (e instanceof DOMException && e.name === 'AbortError') return;
