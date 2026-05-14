@@ -9,7 +9,7 @@ A SvelteKit version of the mosaic photo generator. Image processing happens on t
 ## Run in development
 
 ```bash
-cd mosaic-photo-svelte-version
+cd mosaic-photo-svelte-version-v2
 npm install
 npm run dev -- --open
 ```

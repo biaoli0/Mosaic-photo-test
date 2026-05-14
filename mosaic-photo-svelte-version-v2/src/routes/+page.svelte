@@ -7,14 +7,32 @@
 	let errorMessage = $state('');
 	let progressLabel = $state('');
 	let inflightController: AbortController | null = null;
+	let mosaicDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	const CHUNK_TARGET_HEIGHT = 512;
+	// Debounce slider input so a single drag doesn't fan out into many runs.
+	// toBlob() PNG encoding is not cancellable, so aborting mid-drag can't claw
+	// back work that has already been queued — debouncing is the only way to
+	// avoid the encode in the first place.
+	const MOSAIC_DEBOUNCE_DELAY_MS = 180;
+
+	function scheduleMosaic(): void {
+		if (mosaicDebounceTimer !== null) clearTimeout(mosaicDebounceTimer);
+		mosaicDebounceTimer = setTimeout(() => {
+			mosaicDebounceTimer = null;
+			void createMosaicFromServer();
+		}, MOSAIC_DEBOUNCE_DELAY_MS);
+	}
 
 	async function handleFileChange(event: Event): Promise<void> {
 		const target = event.target as HTMLInputElement;
 		const file = target.files?.[0];
 		if (!file) return;
 
+		if (mosaicDebounceTimer !== null) {
+			clearTimeout(mosaicDebounceTimer);
+			mosaicDebounceTimer = null;
+		}
 		inflightController?.abort();
 		currentBitmap?.close();
 		currentBitmap = null;
@@ -51,7 +69,7 @@
 
 		const chunkCanvas = document.createElement('canvas');
 		chunkCanvas.width = bitmap.width;
-		const chunkCtx = chunkCanvas.getContext('2d', { willReadFrequently: true });
+		const chunkCtx = chunkCanvas.getContext('2d');
 		if (!chunkCtx) return;
 
 		// We make sure the chunk height is always a multiple of `tileSize`,
@@ -96,8 +114,6 @@
 					method: 'POST',
 					headers: {
 						'Content-Type': 'image/png',
-						'X-Chunk-Index': String(chunkIndex),
-						'X-Chunk-Offset-Y': String(y)
 					},
 					body: chunkBlob,
 					signal: controller.signal
@@ -110,6 +126,12 @@
 
 				const mosaicBlob = await response.blob();
 				const mosaicBitmap = await createImageBitmap(mosaicBlob);
+				// Re-check after the awaits above: a newer run may have started and
+				// cleared the canvas, so this stale bitmap must not paint on top.
+				if (controller.signal.aborted) {
+					mosaicBitmap.close();
+					return;
+				}
 				ctx.drawImage(mosaicBitmap, 0, y);
 				mosaicBitmap.close();
 			}
@@ -135,7 +157,7 @@
 	min="2"
 	max="64"
 	bind:value={tileSize}
-	oninput={createMosaicFromServer}
+	oninput={scheduleMosaic}
 />
 
 {#if processing}

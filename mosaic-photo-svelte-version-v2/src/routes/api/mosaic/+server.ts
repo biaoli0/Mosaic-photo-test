@@ -5,6 +5,11 @@ import type { RequestHandler } from './$types';
 
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
 const MAX_BODY_DESCRIPTION = MAX_BODY_BYTES / 1024 / 1024 + ' MB';
+const MIN_TILE_SIZE = 2;
+// Server cap is intentionally looser than the client's slider max (64) so the
+// UI can grow without a coordinated server change, but tight enough to reject
+// obviously bad inputs before they reach sharp / applyMosaic.
+const MAX_TILE_SIZE = 256;
 
 async function readLimitedBody(request: Request, limit: number): Promise<Buffer> {
 	const contentLengthHeader = request.headers.get('content-length');
@@ -41,9 +46,13 @@ async function readLimitedBody(request: Request, limit: number): Promise<Buffer>
 }
 
 export const POST: RequestHandler = async ({ request, url }) => {
-	const tileSize = Number.parseInt(url.searchParams.get('tileSize') ?? '', 10);
-	if (!Number.isInteger(tileSize) || tileSize < 2) {
-		error(400, 'Invalid tileSize query parameter (must be an integer >= 2).');
+	const tileSizeParam = url.searchParams.get('tileSize');
+	const tileSize = Number(tileSizeParam ?? '');
+	if (!Number.isInteger(tileSize) || tileSize < MIN_TILE_SIZE || tileSize > MAX_TILE_SIZE) {
+		error(
+			400,
+			`Invalid tileSize query parameter (must be an integer in [${MIN_TILE_SIZE}, ${MAX_TILE_SIZE}]).`
+		);
 	}
 
 	const inputBuffer = await readLimitedBody(request, MAX_BODY_BYTES);
