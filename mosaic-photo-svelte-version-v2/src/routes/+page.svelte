@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { generateChunkedMosaic } from '$lib/client/chunkedMosaic';
 
+	type MosaicError = { message: string; retry: (() => Promise<void>) | null };
+
 	let mosaicCanvas: HTMLCanvasElement | undefined = $state();
 	let tileSize = $state(12);
 	let processing = $state(false);
-	let errorMessage = $state('');
+	let errorState = $state<MosaicError | null>(null);
 	let progressLabel = $state('');
 
 	let currentBitmap: ImageBitmap | null = null;
@@ -41,13 +43,16 @@
 		inflightController?.abort();
 		currentBitmap?.close();
 		currentBitmap = null;
-		errorMessage = '';
+		errorState = null;
 
 		try {
 			currentBitmap = await createImageBitmap(file);
 			await createMosaicFromServer();
 		} catch (e) {
-			errorMessage = e instanceof Error ? e.message : 'Failed to load image.';
+			errorState = {
+				message: e instanceof Error ? e.message : 'Failed to load image.',
+				retry: null
+			};
 		}
 	}
 
@@ -65,7 +70,7 @@
 		inflightController = controller;
 
 		processing = true;
-		errorMessage = '';
+		errorState = null;
 		progressLabel = 'Preparing canvas...';
 
 		canvas.width = bitmap.width;
@@ -94,7 +99,10 @@
 			// Only surface the error if we're still the current run. A newer
 			// run that supersedes us owns the UI state.
 			if (inflightController === controller) {
-				errorMessage = e instanceof Error ? e.message : 'Failed to generate mosaic.';
+				errorState = {
+					message: e instanceof Error ? e.message : 'Failed to generate mosaic.',
+					retry: () => createMosaicFromServer()
+				};
 			}
 		} finally {
 			if (inflightController === controller) {
@@ -114,17 +122,60 @@
 	<p>{progressLabel}</p>
 {/if}
 
-{#if errorMessage}
-	<p>{errorMessage}</p>
-{/if}
-
 <h2>Mosaic</h2>
-<canvas bind:this={mosaicCanvas}></canvas>
+<svelte:boundary>
+	<div class="mosaic-frame">
+		<canvas bind:this={mosaicCanvas}></canvas>
+		{#if errorState}
+			<div class="error-overlay" role="alert">
+				<p>{errorState.message}</p>
+				{#if errorState.retry}
+					<button type="button" onclick={() => void errorState?.retry?.()}>Retry</button>
+				{/if}
+			</div>
+		{/if}
+	</div>
+
+	{#snippet failed(err, reset)}
+		<div class="error-overlay error-overlay--fatal" role="alert">
+			<p>
+				Something went wrong rendering the mosaic: {err instanceof Error
+					? err.message
+					: 'Unknown error'}
+			</p>
+			<button type="button" onclick={reset}>Reset</button>
+		</div>
+	{/snippet}
+</svelte:boundary>
 
 <style>
 	canvas {
 		display: block;
 		max-width: 100%;
 		height: auto;
+	}
+
+	.mosaic-frame {
+		position: relative;
+		display: inline-block;
+		max-width: 100%;
+	}
+
+	.error-overlay {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.75rem;
+		background: rgba(255, 255, 255, 0.85);
+		color: #1a1a1a;
+		padding: 1rem;
+		text-align: center;
+	}
+
+	.error-overlay--fatal {
+		background: rgba(255, 230, 230, 0.95);
 	}
 </style>
