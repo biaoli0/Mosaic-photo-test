@@ -13,7 +13,7 @@ export type ChunkedMosaicOptions = {
 	concurrency?: number;
 };
 
-const DEFAULT_TARGET_CHUNK_HEIGHT = 256;
+const DEFAULT_TARGET_CHUNK_HEIGHT = 1024;
 const DEFAULT_CONCURRENCY = 4;
 
 export async function generateChunkedMosaic({
