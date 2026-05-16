@@ -113,19 +113,25 @@
 	}
 </script>
 
+{#snippet pending(label: string)}
+	<div class="loading-overlay" role="status" aria-live="polite">
+		<span class="loading-spinner" aria-hidden="true"></span>
+		<p>{label}</p>
+	</div>
+{/snippet}
+
 <h1>Mosaic Photo Generator (Chunked)</h1>
 <input type="file" accept="image/*" onchange={handleFileChange} />
 <label for="tileSize">Tile Size: {tileSize} px</label>
 <input id="tileSize" type="range" min="2" max="64" bind:value={tileSize} oninput={debounceMosaic} />
 
-{#if processing}
-	<p>{progressLabel}</p>
-{/if}
-
 <h2>Mosaic</h2>
 <svelte:boundary>
 	<div class="mosaic-frame">
 		<canvas bind:this={mosaicCanvas}></canvas>
+		{#if processing && !errorState}
+			{@render pending(progressLabel)}
+		{/if}
 		{#if errorState}
 			<div class="error-overlay" role="alert">
 				<p>{errorState.message}</p>
@@ -159,6 +165,36 @@
 		position: relative;
 		display: inline-block;
 		max-width: 100%;
+	}
+
+	.loading-overlay {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.6rem;
+		background: rgba(255, 255, 255, 0.65);
+		color: #1a1a1a;
+		padding: 1rem;
+		text-align: center;
+		pointer-events: none;
+	}
+
+	.loading-spinner {
+		width: 1.1rem;
+		height: 1.1rem;
+		border: 2px solid rgba(0, 0, 0, 0.2);
+		border-top-color: #1a1a1a;
+		border-radius: 50%;
+		animation: loading-spin 0.8s linear infinite;
+	}
+
+	@keyframes loading-spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.error-overlay {
