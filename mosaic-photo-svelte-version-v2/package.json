@@ -35,8 +35,5 @@
 		"typescript-eslint": "^8.58.1",
 		"vite": "^8.0.7",
 		"vitest": "^4.1.6"
-	},
-	"dependencies": {
-		"sharp": "^0.34.0"
 	}
 }

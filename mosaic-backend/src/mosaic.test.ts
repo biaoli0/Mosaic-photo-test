@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyMosaic } from './mosaic';
+import { applyMosaic } from './mosaic.ts';
 
 function makePixels(rgbaList: number[][]): Uint8Array {
 	const pixels = new Uint8Array(rgbaList.length * 4);
