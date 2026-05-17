@@ -1,5 +1,5 @@
 const BACKEND_BASE_URL = (
-	import.meta.env.VITE_MOSAIC_BACKEND_URL ?? 'http://localhost:3001'
+	import.meta.env.VITE_MOSAIC_PHOTO_API_URL ?? 'http://localhost:3001'
 ).replace(/\/+$/, '');
 
 export async function postMosaicChunk(
