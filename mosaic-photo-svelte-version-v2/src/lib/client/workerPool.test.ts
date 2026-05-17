@@ -154,6 +154,7 @@ describe('runWorkerPool', () => {
 			}
 		});
 
+		// Ensure that 'externalSignal.abort' event listener added and removed exactly once, and to the same handler
 		const adds = addSpy.mock.calls.filter((c) => c[0] === 'abort');
 		const removes = removeSpy.mock.calls.filter((c) => c[0] === 'abort');
 		expect(adds).toHaveLength(1);
