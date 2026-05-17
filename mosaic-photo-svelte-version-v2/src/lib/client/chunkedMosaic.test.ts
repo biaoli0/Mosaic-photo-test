@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { generateChunkedMosaic } from './chunkedMosaic';
-import { postMosaicChunk } from './mosaicTransport';
+import { postMosaicChunk } from './postMosaicChunk';
 
 vi.mock('./mosaicTransport', () => ({
 	postMosaicChunk: vi.fn()

@@ -1,6 +1,6 @@
 import { createChunkExtractor } from './chunkExtractor';
 import { planChunks } from './chunkPlanner';
-import { postMosaicChunk } from './mosaicTransport';
+import { postMosaicChunk } from './postMosaicChunk';
 import { runWorkerPool } from './workerPool';
 
 export type ChunkedMosaicOptions = {
