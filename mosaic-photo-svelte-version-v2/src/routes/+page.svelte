@@ -13,10 +13,7 @@
 	let inflightController: AbortController | null = null;
 	let mosaicDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-	// Debounce slider input so a single drag doesn't fan out into many runs.
-	// toBlob() PNG encoding is not cancellable, so aborting mid-drag can't claw
-	// back work that has already been queued — debouncing is the only way to
-	// avoid the encode in the first place.
+	// Debouncing prevents queued canvas encodes that AbortController cannot cancel.
 	const MOSAIC_DEBOUNCE_DELAY_MS = 180;
 
 	function clearDebounce(): void {
@@ -83,9 +80,6 @@
 				tileSize,
 				signal: controller.signal,
 				onChunkReady: (chunkBitmap, y) => {
-					// A newer run may have replaced us between when this chunk
-					// was decoded and now. Don't paint stale pixels onto the
-					// canvas it has already cleared.
 					if (controller.signal.aborted) return;
 					ctx.drawImage(chunkBitmap, 0, y);
 				},
@@ -96,8 +90,6 @@
 			});
 		} catch (e) {
 			if (e instanceof DOMException && e.name === 'AbortError') return;
-			// Only surface the error if we're still the current run. A newer
-			// run that supersedes us owns the UI state.
 			if (inflightController === controller) {
 				errorState = {
 					message: e instanceof Error ? e.message : 'Failed to generate mosaic.',
@@ -120,12 +112,11 @@
 	</div>
 {/snippet}
 
-<h1>Mosaic Photo Generator (Chunked)</h1>
+<h1>Mosaic Photo Generator</h1>
 <input type="file" accept="image/*" onchange={handleFileChange} />
 <label for="tileSize">Tile Size: {tileSize} px</label>
 <input id="tileSize" type="range" min="2" max="64" bind:value={tileSize} oninput={debounceMosaic} />
 
-<h2>Mosaic</h2>
 <svelte:boundary>
 	<div class="mosaic-frame">
 		<canvas bind:this={mosaicCanvas}></canvas>
@@ -165,6 +156,7 @@
 		position: relative;
 		display: inline-block;
 		max-width: 100%;
+		margin:10px;
 	}
 
 	.loading-overlay {

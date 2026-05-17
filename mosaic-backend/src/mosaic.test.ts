@@ -1,6 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { applyMosaic } from './mosaic.ts';
 
+/**
+ * Creates a flat RGBA Uint8Array from a list of [R, G, B, A] values.
+ *
+ * Example:
+ *   makePixels([
+ *     [255, 0, 0, 255],
+ *     [0, 255, 0, 255],
+ *   ])
+ *   // => Uint8Array [255, 0, 0, 255, 0, 255, 0, 255]
+ *
+ * @param rgbaList - Array of RGBA pixel arrays, e.g. [[R, G, B, A], ...]
+ * @returns Uint8Array containing all pixel channels in row-major order
+ */
 function makePixels(rgbaList: number[][]): Uint8Array {
 	const pixels = new Uint8Array(rgbaList.length * 4);
 	for (let i = 0; i < rgbaList.length; i += 1) {
@@ -9,6 +22,10 @@ function makePixels(rgbaList: number[][]): Uint8Array {
 	return pixels;
 }
 
+/**
+ * Get the RGBA values of the pixel at position (x, y).
+ * x is the horizontal pixel coordinate (0 = left), y is the vertical coordinate (0 = top).
+ */
 function getPixel(pixels: Uint8Array, width: number, x: number, y: number): number[] {
 	const idx = (y * width + x) * 4;
 	return [pixels[idx], pixels[idx + 1], pixels[idx + 2], pixels[idx + 3]];

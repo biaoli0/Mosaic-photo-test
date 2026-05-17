@@ -5,8 +5,7 @@ export function planChunks(
 	tileSize: number,
 	targetChunkHeight: number
 ): ChunkPlan[] {
-	// Chunk height is forced to a multiple of `tileSize` so a tile never
-	// straddles two chunks (which would produce visible seams). 
+	// Chunk heights align to tileSize so tiles do not straddle chunks and leave seams.
 	const chunkBaseHeight = Math.max(tileSize, Math.floor(targetChunkHeight / tileSize) * tileSize);
 	const totalChunks = Math.ceil(bitmapHeight / chunkBaseHeight);
 	if (totalChunks === 0) return [];

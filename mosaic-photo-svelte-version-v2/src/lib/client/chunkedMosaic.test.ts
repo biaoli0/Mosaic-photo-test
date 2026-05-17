@@ -74,7 +74,7 @@ describe('generateChunkedMosaic', () => {
 			signal: new AbortController().signal,
 			targetChunkHeight: 100,
 			onProgress: (done, total) => progress.push([done, total]),
-			onChunkReady: () => {}
+			onChunkReady: () => { }
 		});
 
 		// `completed` is a shared counter incremented synchronously, so the
@@ -95,7 +95,7 @@ describe('generateChunkedMosaic', () => {
 			vi.fn(async () => {
 				const close = vi.fn();
 				closes.push(close);
-				return { width: 0, height: 0, close } as unknown as ImageBitmap;
+				return { width: 0, height: 0, close } as Pick<ImageBitmap, 'width' | 'height' | 'close'>;
 			})
 		);
 
@@ -104,7 +104,7 @@ describe('generateChunkedMosaic', () => {
 			tileSize: 10,
 			signal: new AbortController().signal,
 			targetChunkHeight: 100,
-			onChunkReady: () => {}
+			onChunkReady: () => { }
 		});
 
 		expect(closes).toHaveLength(3);
@@ -145,10 +145,14 @@ describe('generateChunkedMosaic', () => {
 
 		await decodeStarted;
 		controller.abort();
-		resolveDecode({ width: 0, height: 0, close: bitmapClose } as unknown as ImageBitmap);
 
 		await expect(promise).resolves.toBeUndefined();
 		expect(stalePainted).not.toHaveBeenCalled();
+		expect(bitmapClose).not.toHaveBeenCalled();
+
+		resolveDecode({ width: 0, height: 0, close: bitmapClose } as Pick<ImageBitmap, 'width' | 'height' | 'close'>);
+		await Promise.resolve();
+
 		expect(bitmapClose).toHaveBeenCalledTimes(1);
 	});
 });

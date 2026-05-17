@@ -50,8 +50,7 @@ export async function generateChunkedMosaic({
 				const mosaicBitmap = await createImageBitmap(mosaicBlob);
 
 				// Re-check after the awaits above. The signal may have aborted
-				// while we were decoding, in which case the caller has already
-				// moved on and this stale bitmap must not be surfaced.
+				// while we were decoding.
 				if (poolSignal.aborted) {
 					mosaicBitmap.close();
 					return;

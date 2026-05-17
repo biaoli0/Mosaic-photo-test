@@ -1,9 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { runWorkerPool } from './workerPool';
 
-// Two macrotask hops are enough to let workers reach their first await
-// before we externally abort.
-async function flushAsync(): Promise<void> {
+async function waitForWorkersToReachAwait(): Promise<void> {
 	await new Promise((r) => setTimeout(r, 0));
 	await new Promise((r) => setTimeout(r, 0));
 }
@@ -75,7 +73,7 @@ describe('runWorkerPool', () => {
 			}
 		});
 
-		await flushAsync();
+		await waitForWorkersToReachAwait();
 		ctrl.abort();
 		await expect(promise).resolves.toBeUndefined();
 	});
@@ -118,8 +116,6 @@ describe('runWorkerPool', () => {
 		).rejects.toThrow('boom');
 
 		expect(seenSignals.length).toBeGreaterThanOrEqual(2);
-		// All signals are references to the same internal controller, so once
-		// any worker triggers abort, every signal is flipped.
 		expect(seenSignals.every((s) => s.aborted)).toBe(true);
 	});
 
@@ -139,7 +135,7 @@ describe('runWorkerPool', () => {
 			}
 		});
 
-		await flushAsync();
+		await waitForWorkersToReachAwait();
 		ctrl.abort();
 		await expect(promise).resolves.toBeUndefined();
 	});

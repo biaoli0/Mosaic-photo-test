@@ -2,12 +2,8 @@ import type { ChunkPlan } from './chunkPlanner';
 
 export type ChunkExtractor = (plan: ChunkPlan) => Promise<Blob>;
 
-// Each call returns a fresh extractor that owns its own canvas. Callers
-// running extractors in parallel must each get their own — sharing one
-// would race on toBlob(): toBlob() reads the canvas asynchronously, so
-// between drawImage and the encode actually running, a sibling could
-// resize or repaint the canvas and the resulting blob would silently
-// capture the wrong pixels.
+// Each extractor owns a canvas because toBlob() reads asynchronously;
+// sharing one across parallel extracts can encode the wrong pixels.
 export function createChunkExtractor(bitmap: ImageBitmap): ChunkExtractor {
 	const canvas = document.createElement('canvas');
 	canvas.width = bitmap.width;

@@ -18,9 +18,6 @@ export async function runWorkerPool({
 }: WorkerPoolOptions): Promise<void> {
 	if (total === 0) return;
 
-	// An internal controller lets one failing worker cancel its siblings'
-	// in-flight work without mutating the caller's signal. External aborts
-	// are forwarded into it.
 	const internal = new AbortController();
 	const forwardAbort = () => internal.abort(externalSignal.reason);
 	if (externalSignal.aborted) {
