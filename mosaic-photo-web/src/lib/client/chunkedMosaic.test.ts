@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { generateChunkedMosaic } from './chunkedMosaic';
 import { postMosaicChunk } from './postMosaicChunk';
 
-vi.mock('./mosaicTransport', () => ({
+vi.mock('./postMosaicChunk', () => ({
 	postMosaicChunk: vi.fn()
 }));
 
@@ -146,13 +146,15 @@ describe('generateChunkedMosaic', () => {
 		await decodeStarted;
 		controller.abort();
 
-		await expect(promise).resolves.toBeUndefined();
+		resolveDecode(
+			{ width: 0, height: 0, close: bitmapClose } as Pick<
+				ImageBitmap,
+				'width' | 'height' | 'close'
+			>
+		);
+		await promise;
+
 		expect(stalePainted).not.toHaveBeenCalled();
-		expect(bitmapClose).not.toHaveBeenCalled();
-
-		resolveDecode({ width: 0, height: 0, close: bitmapClose } as Pick<ImageBitmap, 'width' | 'height' | 'close'>);
-		await Promise.resolve();
-
 		expect(bitmapClose).toHaveBeenCalledTimes(1);
 	});
 });

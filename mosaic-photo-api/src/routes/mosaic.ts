@@ -2,10 +2,27 @@ import express, { Router, type Request, type Response, type NextFunction } from 
 import sharp from 'sharp';
 import { applyMosaic } from '../mosaic';
 
-const MAX_BODY_BYTES = 12 * 1024 * 1024;
+function parseEnvPositiveInt(name: string, defaultValue: number): number {
+	const raw = process.env[name];
+	if (raw === undefined || raw.trim() === '') return defaultValue;
+	const n = Number(raw);
+	if (!Number.isInteger(n) || n < 1) {
+		throw new Error(`Environment variable ${name} must be a positive integer, got: ${raw}`);
+	}
+	return n;
+}
+
+const MAX_BODY_BYTES = parseEnvPositiveInt('MAX_BODY_BYTES', 20 * 1024 * 1024);
+const MIN_TILE_SIZE = parseEnvPositiveInt('MIN_TILE_SIZE', 2);
+const MAX_TILE_SIZE = parseEnvPositiveInt('MAX_TILE_SIZE', 256);
+
+if (MIN_TILE_SIZE > MAX_TILE_SIZE) {
+	throw new Error(
+		`Invalid mosaic limits: MIN_TILE_SIZE (${MIN_TILE_SIZE}) cannot be greater than MAX_TILE_SIZE (${MAX_TILE_SIZE})`
+	);
+}
+
 const MAX_BODY_DESCRIPTION = MAX_BODY_BYTES / 1024 / 1024 + ' MB';
-const MIN_TILE_SIZE = 2;
-const MAX_TILE_SIZE = 256;
 
 export const mosaicRouter: Router = Router();
 

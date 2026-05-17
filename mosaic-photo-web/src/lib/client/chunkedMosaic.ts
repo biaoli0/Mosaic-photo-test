@@ -1,3 +1,7 @@
+import {
+	DEFAULT_CHUNK_CONCURRENCY,
+	DEFAULT_CHUNK_TARGET_HEIGHT
+} from '$lib/mosaicChunkDefaults';
 import { createChunkExtractor } from './chunkExtractor';
 import { planChunks } from './chunkPlanner';
 import { postMosaicChunk } from './postMosaicChunk';
@@ -13,17 +17,14 @@ export type ChunkedMosaicOptions = {
 	concurrency?: number;
 };
 
-const DEFAULT_TARGET_CHUNK_HEIGHT = 1024;
-const DEFAULT_CONCURRENCY = 4;
-
 export async function generateChunkedMosaic({
 	bitmap,
 	tileSize,
 	signal,
 	onChunkReady,
 	onProgress,
-	targetChunkHeight = DEFAULT_TARGET_CHUNK_HEIGHT,
-	concurrency = DEFAULT_CONCURRENCY
+	targetChunkHeight = DEFAULT_CHUNK_TARGET_HEIGHT,
+	concurrency = DEFAULT_CHUNK_CONCURRENCY
 }: ChunkedMosaicOptions): Promise<void> {
 	const plans = planChunks(bitmap.height, tileSize, targetChunkHeight);
 	const total = plans.length;

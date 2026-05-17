@@ -1,10 +1,14 @@
 <script lang="ts">
+	import type { PageProps } from './$types';
 	import { generateChunkedMosaic } from '$lib/client/chunkedMosaic';
+
+	let { data }: PageProps = $props();
 
 	type MosaicError = { message: string; retry: (() => Promise<void>) | null };
 
 	let mosaicCanvas: HTMLCanvasElement | undefined = $state();
 	let tileSize = $state(12);
+	let tileSizeSeededFromLoad = $state(false);
 	let processing = $state(false);
 	let errorState = $state<MosaicError | null>(null);
 	let progressLabel = $state('');
@@ -12,6 +16,12 @@
 	let currentBitmap: ImageBitmap | null = null;
 	let inflightController: AbortController | null = null;
 	let mosaicDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+	$effect.pre(() => {
+		if (tileSizeSeededFromLoad) return;
+		tileSize = data.tileSizeDefault;
+		tileSizeSeededFromLoad = true;
+	});
 
 	// Debouncing prevents queued canvas encodes that AbortController cannot cancel.
 	const MOSAIC_DEBOUNCE_DELAY_MS = 180;
@@ -78,6 +88,8 @@
 			await generateChunkedMosaic({
 				bitmap,
 				tileSize,
+				targetChunkHeight: data.mosaicChunkTargetHeight,
+				concurrency: data.mosaicChunkConcurrency,
 				signal: controller.signal,
 				onChunkReady: (chunkBitmap, y) => {
 					if (controller.signal.aborted) return;
@@ -115,7 +127,14 @@
 <h1>Mosaic Photo Generator</h1>
 <input type="file" accept="image/*" onchange={handleFileChange} />
 <label for="tileSize">Tile Size: {tileSize} px</label>
-<input id="tileSize" type="range" min="2" max="64" bind:value={tileSize} oninput={debounceMosaic} />
+<input
+	id="tileSize"
+	type="range"
+	min={data.tileSliderMin}
+	max={data.tileSliderMax}
+	bind:value={tileSize}
+	oninput={debounceMosaic}
+/>
 
 <svelte:boundary>
 	<div class="mosaic-frame">
