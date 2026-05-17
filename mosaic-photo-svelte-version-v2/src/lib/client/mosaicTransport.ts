@@ -3,16 +3,21 @@ const BACKEND_BASE_URL = (
 ).replace(/\/+$/, '');
 
 export async function postMosaicChunk(
-	chunkBlob: Blob,
+	chunkRgba: Uint8Array,
+	width: number,
+	height: number,
 	tileSize: number,
 	signal: AbortSignal
 ): Promise<Blob> {
-	const response = await fetch(`${BACKEND_BASE_URL}/mosaic?tileSize=${tileSize}`, {
+	const response = await fetch(
+		`${BACKEND_BASE_URL}/mosaic?tileSize=${tileSize}&width=${width}&height=${height}`,
+		{
 		method: 'POST',
-		headers: { 'Content-Type': 'image/png' },
-		body: chunkBlob,
+		headers: { 'Content-Type': 'application/octet-stream' },
+		body: chunkRgba,
 		signal
-	});
+	}
+	);
 
 	if (!response.ok) {
 		const text = await response.text();

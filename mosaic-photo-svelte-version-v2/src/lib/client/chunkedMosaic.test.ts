@@ -19,6 +19,7 @@ function makeBitmap(width: number, height: number): FakeBitmap {
 type FakeCtx = {
 	clearRect: ReturnType<typeof vi.fn>;
 	drawImage: ReturnType<typeof vi.fn>;
+	getImageData: ReturnType<typeof vi.fn>;
 };
 
 type FakeCanvas = {
@@ -32,7 +33,10 @@ type FakeCanvas = {
 function makeChunkCanvas(): FakeCanvas {
 	const ctx: FakeCtx = {
 		clearRect: vi.fn(),
-		drawImage: vi.fn()
+		drawImage: vi.fn(),
+		getImageData: vi.fn((x: number, y: number, width: number, height: number) => ({
+			data: new Uint8ClampedArray(width * height * 4)
+		}))
 	};
 	return {
 		width: 0,

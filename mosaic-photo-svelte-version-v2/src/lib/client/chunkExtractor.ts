@@ -1,6 +1,12 @@
 import type { ChunkPlan } from './chunkPlanner';
 
-export type ChunkExtractor = (plan: ChunkPlan) => Promise<Blob>;
+export type RawChunk = {
+	width: number;
+	height: number;
+	rgba: Uint8Array;
+};
+
+export type ChunkExtractor = (plan: ChunkPlan) => RawChunk;
 
 // Each call returns a fresh extractor that owns its own canvas. Callers
 // running extractors in parallel must each get their own — sharing one
@@ -16,16 +22,16 @@ export function createChunkExtractor(bitmap: ImageBitmap): ChunkExtractor {
 		throw new Error('Failed to acquire 2D context for chunk canvas.');
 	}
 
-	return async function extract({ y, height }: ChunkPlan): Promise<Blob> {
+	return function extract({ y, height }: ChunkPlan): RawChunk {
 		canvas.height = height;
 		ctx.clearRect(0, 0, bitmap.width, height);
 		ctx.drawImage(bitmap, 0, y, bitmap.width, height, 0, 0, bitmap.width, height);
 
-		return await new Promise<Blob>((resolve, reject) => {
-			canvas.toBlob(
-				(blob) => (blob ? resolve(blob) : reject(new Error('Failed to encode chunk.'))),
-				'image/png'
-			);
-		});
+		const imageData = ctx.getImageData(0, 0, bitmap.width, height);
+		return {
+			width: bitmap.width,
+			height,
+			rgba: imageData.data
+		};
 	};
 }

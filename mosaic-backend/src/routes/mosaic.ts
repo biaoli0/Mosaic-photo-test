@@ -29,16 +29,41 @@ mosaicRouter.post('/', rawImage, async (req: Request, res: Response): Promise<vo
 		return;
 	}
 
-	try {
-		const { data: raw, info } = await sharp(inputBuffer)
-			.ensureAlpha()
-			.raw()
-			.toBuffer({ resolveWithObject: true });
+	const rawWidth = Number(req.query.width ?? '');
+	const rawHeight = Number(req.query.height ?? '');
+	const useRawInput = Number.isInteger(rawWidth) && Number.isInteger(rawHeight);
 
-		const processed = applyMosaic(raw, info.width, info.height, tileSize);
+	try {
+		let raw: Uint8Array;
+		let width: number;
+		let height: number;
+
+		if (useRawInput) {
+			if (rawWidth <= 0 || rawHeight <= 0) {
+				res.status(400).send('width and height must be positive integers.');
+				return;
+			}
+
+			const expectedBytes = rawWidth * rawHeight * 4;
+			if (inputBuffer.length !== expectedBytes) {
+				res.status(400).send(`Raw RGBA payload size mismatch: expected ${expectedBytes} bytes.`);
+				return;
+			}
+
+			raw = inputBuffer;
+			width = rawWidth;
+			height = rawHeight;
+		} else {
+			const decoded = await sharp(inputBuffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+			raw = decoded.data;
+			width = decoded.info.width;
+			height = decoded.info.height;
+		}
+
+		const processed = applyMosaic(raw, width, height, tileSize);
 
 		const pngBuffer = await sharp(Buffer.from(processed), {
-			raw: { width: info.width, height: info.height, channels: 4 }
+			raw: { width, height, channels: 4 }
 		})
 			.png()
 			.toBuffer();

@@ -36,8 +36,8 @@ export async function generateChunkedMosaic({
 		total,
 		concurrency,
 		externalSignal: signal,
-		runWorker: async ({ signal: poolSignal, claimNext }) => {
-			const extract = createChunkExtractor(bitmap);
+			runWorker: async ({ signal: poolSignal, claimNext }) => {
+				const extract = createChunkExtractor(bitmap);
 
 			while (true) {
 				if (poolSignal.aborted) return;
@@ -45,8 +45,14 @@ export async function generateChunkedMosaic({
 				if (i >= total) return;
 
 				const plan = plans[i];
-				const chunkBlob = await extract(plan);
-				const mosaicBlob = await postMosaicChunk(chunkBlob, tileSize, poolSignal);
+				const rawChunk = extract(plan);
+				const mosaicBlob = await postMosaicChunk(
+					rawChunk.rgba,
+					rawChunk.width,
+					rawChunk.height,
+					tileSize,
+					poolSignal
+				);
 				const mosaicBitmap = await createImageBitmap(mosaicBlob);
 
 				// Re-check after the awaits above. The signal may have aborted
