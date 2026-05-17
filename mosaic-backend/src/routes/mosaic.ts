@@ -1,6 +1,6 @@
 import express, { Router, type Request, type Response, type NextFunction } from 'express';
 import sharp from 'sharp';
-import { applyMosaic } from '../mosaic.ts';
+import { applyMosaic } from '../mosaic';
 
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
 const MAX_BODY_DESCRIPTION = MAX_BODY_BYTES / 1024 / 1024 + ' MB';

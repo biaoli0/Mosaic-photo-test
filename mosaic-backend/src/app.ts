@@ -1,6 +1,6 @@
 import express, { type Express } from 'express';
 import cors from 'cors';
-import { mosaicRouter, payloadTooLargeHandler } from './routes/mosaic.ts';
+import { mosaicRouter, payloadTooLargeHandler } from './routes/mosaic';
 
 export function createApp(): Express {
 	const app = express();

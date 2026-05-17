@@ -21,6 +21,16 @@ npm run dev
 
 Defaults to `http://localhost:3001`. Override with `PORT` / `HOST` env vars.
 
+## Build and run
+
+```bash
+cd mosaic-backend
+npm run build
+npm start
+```
+
+Compiled JavaScript is written to `dist/`.
+
 ## Configuration
 
 | Env var       | Default                    | Notes                                                       |
