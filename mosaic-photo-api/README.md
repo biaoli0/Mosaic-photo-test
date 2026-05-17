@@ -1,4 +1,4 @@
-# mosaic-backend
+# mosaic-photo-api
 
 Express backend for mosaic image processing. Decoupled from the SvelteKit frontend so the two can be deployed and scaled independently.
 
@@ -14,7 +14,7 @@ Express backend for mosaic image processing. Decoupled from the SvelteKit fronte
 ## Run in development
 
 ```bash
-cd mosaic-backend
+cd mosaic-photo-api
 npm install
 npm run dev
 ```
@@ -24,7 +24,7 @@ Defaults to `http://localhost:3001`. Override with `PORT` / `HOST` env vars.
 ## Build and run
 
 ```bash
-cd mosaic-backend
+cd mosaic-photo-api
 npm run build
 npm start
 ```
