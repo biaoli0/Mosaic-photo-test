@@ -1,6 +1,9 @@
 <script lang="ts">
-	import type { PageProps } from './$types';
+	import MosaicControls from '$lib/components/mosaic/MosaicControls.svelte';
+	import MosaicPreview from '$lib/components/mosaic/MosaicPreview.svelte';
 	import { generateChunkedMosaic } from '$lib/client/chunkedMosaic';
+	import { downloadMosaic as downloadCanvasMosaic } from '$lib/client/downloadMosaic';
+	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
@@ -12,10 +15,13 @@
 	let processing = $state(false);
 	let errorState = $state<MosaicError | null>(null);
 	let progressLabel = $state('');
+	let hasImage = $state(false);
+	let selectedFileName = $state('');
 
 	let currentBitmap: ImageBitmap | null = null;
 	let inflightController: AbortController | null = null;
 	let mosaicDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let canDownloadMosaic = $derived(hasImage && !processing && !errorState);
 
 	$effect.pre(() => {
 		if (tileSizeSeededFromLoad) return;
@@ -46,14 +52,30 @@
 		const file = target.files?.[0];
 		if (!file) return;
 
+		await processFile(file);
+	}
+
+	async function processFile(file: File): Promise<void> {
 		clearDebounce();
 		inflightController?.abort();
 		currentBitmap?.close();
 		currentBitmap = null;
+		hasImage = false;
+		selectedFileName = '';
 		errorState = null;
+
+		if (file.type && !file.type.startsWith('image/')) {
+			errorState = {
+				message: 'Choose an image file to generate a mosaic.',
+				retry: null
+			};
+			return;
+		}
 
 		try {
 			currentBitmap = await createImageBitmap(file);
+			hasImage = true;
+			selectedFileName = file.name;
 			await createMosaicFromServer();
 		} catch (e) {
 			errorState = {
@@ -115,114 +137,49 @@
 			}
 		}
 	}
+
+	async function downloadMosaic(): Promise<void> {
+		await downloadCanvasMosaic({
+			canvas: mosaicCanvas,
+			canDownloadMosaic,
+			selectedFileName
+		});
+	}
 </script>
 
-{#snippet pending(label: string)}
-	<div class="loading-overlay" role="status" aria-live="polite">
-		<span class="loading-spinner" aria-hidden="true"></span>
-		<p>{label}</p>
-	</div>
-{/snippet}
+<section class="editor" aria-labelledby="editor-title">
+	<MosaicControls
+		bind:tileSize
+		tileSliderMin={data.tileSliderMin}
+		tileSliderMax={data.tileSliderMax}
+		{selectedFileName}
+		onFileChange={handleFileChange}
+		onTileInput={debounceMosaic}
+	/>
 
-<h1>Mosaic Photo Generator</h1>
-<input type="file" accept="image/*" onchange={handleFileChange} />
-<label for="tileSize">Tile Size: {tileSize} px</label>
-<input
-	id="tileSize"
-	type="range"
-	min={data.tileSliderMin}
-	max={data.tileSliderMax}
-	bind:value={tileSize}
-	oninput={debounceMosaic}
-/>
-
-<svelte:boundary>
-	<div class="mosaic-frame">
-		<canvas bind:this={mosaicCanvas}></canvas>
-		{#if processing && !errorState}
-			{@render pending(progressLabel)}
-		{/if}
-		{#if errorState}
-			<div class="error-overlay" role="alert">
-				<p>{errorState.message}</p>
-				{#if errorState.retry}
-					<button type="button" onclick={() => void errorState?.retry?.()}>Retry</button>
-				{/if}
-			</div>
-		{/if}
-	</div>
-
-	{#snippet failed(err, reset)}
-		<div class="error-overlay error-overlay--fatal" role="alert">
-			<p>
-				Something went wrong rendering the mosaic: {err instanceof Error
-					? err.message
-					: 'Unknown error'}
-			</p>
-			<button type="button" onclick={reset}>Reset</button>
-		</div>
-	{/snippet}
-</svelte:boundary>
+	<MosaicPreview
+		bind:mosaicCanvas
+		{processing}
+		{errorState}
+		{progressLabel}
+		{hasImage}
+		{canDownloadMosaic}
+		onDownload={downloadMosaic}
+		onFileDrop={processFile}
+	/>
+</section>
 
 <style>
-	canvas {
-		display: block;
-		max-width: 100%;
-		height: auto;
+	.editor {
+		display: grid;
+		grid-template-columns: minmax(17rem, 24rem) minmax(0, 1fr);
+		gap: clamp(1rem, 3vw, 1.75rem);
+		align-items: stretch;
 	}
 
-	.mosaic-frame {
-		position: relative;
-		display: inline-block;
-		max-width: 100%;
-		margin:10px;
-	}
-
-	.loading-overlay {
-		position: absolute;
-		inset: 0;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.6rem;
-		background: rgba(255, 255, 255, 0.65);
-		color: #1a1a1a;
-		padding: 1rem;
-		text-align: center;
-		pointer-events: none;
-	}
-
-	.loading-spinner {
-		width: 1.1rem;
-		height: 1.1rem;
-		border: 2px solid rgba(0, 0, 0, 0.2);
-		border-top-color: #1a1a1a;
-		border-radius: 50%;
-		animation: loading-spin 0.8s linear infinite;
-	}
-
-	@keyframes loading-spin {
-		to {
-			transform: rotate(360deg);
+	@media (max-width: 860px) {
+		.editor {
+			grid-template-columns: 1fr;
 		}
-	}
-
-	.error-overlay {
-		position: absolute;
-		inset: 0;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.75rem;
-		background: rgba(255, 255, 255, 0.85);
-		color: #1a1a1a;
-		padding: 1rem;
-		text-align: center;
-	}
-
-	.error-overlay--fatal {
-		background: rgba(255, 230, 230, 0.95);
 	}
 </style>
