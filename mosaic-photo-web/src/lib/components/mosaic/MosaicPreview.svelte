@@ -1,4 +1,6 @@
 <script lang="ts">
+	import MosaicDropTarget from './MosaicDropTarget.svelte';
+
 	type MosaicError = { message: string; retry: (() => Promise<void>) | null };
 
 	type Props = {
@@ -7,6 +9,7 @@
 		errorState: MosaicError | null;
 		progressLabel: string;
 		hasImage: boolean;
+		onFileDrop: (file: File) => void | Promise<void>;
 	};
 
 	let {
@@ -14,7 +17,8 @@
 		processing,
 		errorState,
 		progressLabel,
-		hasImage
+		hasImage,
+		onFileDrop
 	}: Props = $props();
 </script>
 
@@ -42,10 +46,11 @@
 		</div>
 
 		<div class="mosaic-frame" class:has-image={hasImage}>
+			<MosaicDropTarget {onFileDrop} />
 			{#if !hasImage && !processing && !errorState}
 				<div class="empty-preview">
 					<span class="empty-preview-icon" aria-hidden="true"></span>
-					<p>Choose an image to generate a mosaic preview.</p>
+					<p>Choose an image or drop it here to generate a mosaic preview.</p>
 				</div>
 			{/if}
 			<canvas bind:this={mosaicCanvas}></canvas>
@@ -163,6 +168,8 @@
 	}
 
 	.empty-preview {
+		position: relative;
+		z-index: 2;
 		display: grid;
 		place-items: center;
 		gap: 1rem;
@@ -196,6 +203,7 @@
 	.loading-overlay {
 		position: absolute;
 		inset: 0;
+		z-index: 3;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -231,6 +239,7 @@
 	.error-overlay {
 		position: absolute;
 		inset: 0;
+		z-index: 3;
 		display: flex;
 		flex-direction: column;
 		align-items: center;

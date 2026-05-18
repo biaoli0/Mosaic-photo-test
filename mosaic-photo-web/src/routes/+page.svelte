@@ -50,6 +50,10 @@
 		const file = target.files?.[0];
 		if (!file) return;
 
+		await processFile(file);
+	}
+
+	async function processFile(file: File): Promise<void> {
 		clearDebounce();
 		inflightController?.abort();
 		currentBitmap?.close();
@@ -57,6 +61,14 @@
 		hasImage = false;
 		selectedFileName = '';
 		errorState = null;
+
+		if (file.type && !file.type.startsWith('image/')) {
+			errorState = {
+				message: 'Choose an image file to generate a mosaic.',
+				retry: null
+			};
+			return;
+		}
 
 		try {
 			currentBitmap = await createImageBitmap(file);
@@ -135,7 +147,14 @@
 		onTileInput={debounceMosaic}
 	/>
 
-	<MosaicPreview bind:mosaicCanvas {processing} {errorState} {progressLabel} {hasImage} />
+	<MosaicPreview
+		bind:mosaicCanvas
+		{processing}
+		{errorState}
+		{progressLabel}
+		{hasImage}
+		onFileDrop={processFile}
+	/>
 </section>
 
 <style>
