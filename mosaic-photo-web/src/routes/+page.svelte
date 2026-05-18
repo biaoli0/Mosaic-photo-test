@@ -2,6 +2,7 @@
 	import MosaicControls from '$lib/components/mosaic/MosaicControls.svelte';
 	import MosaicPreview from '$lib/components/mosaic/MosaicPreview.svelte';
 	import { generateChunkedMosaic } from '$lib/client/chunkedMosaic';
+	import { downloadMosaic as downloadCanvasMosaic } from '$lib/client/downloadMosaic';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -137,35 +138,12 @@
 		}
 	}
 
-	function getDownloadFileName(): string {
-		const fallbackName = 'mosaic';
-		const trimmedName = selectedFileName.trim();
-		if (!trimmedName) return `${fallbackName}.png`;
-
-		const extensionIndex = trimmedName.lastIndexOf('.');
-		const baseName =
-			extensionIndex > 0 ? trimmedName.slice(0, extensionIndex).trim() : trimmedName;
-
-		return `${baseName || fallbackName}-mosaic.png`;
-	}
-
 	async function downloadMosaic(): Promise<void> {
-		const canvas = mosaicCanvas;
-		if (!canvas || !canDownloadMosaic) return;
-
-		const blob = await new Promise<Blob>((resolve, reject) => {
-			canvas.toBlob(
-				(result) =>
-					result ? resolve(result) : reject(new Error('Failed to encode mosaic image.')),
-				'image/png'
-			);
+		await downloadCanvasMosaic({
+			canvas: mosaicCanvas,
+			canDownloadMosaic,
+			selectedFileName
 		});
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement('a');
-		link.href = url;
-		link.download = getDownloadFileName();
-		link.click();
-		URL.revokeObjectURL(url);
 	}
 </script>
 
