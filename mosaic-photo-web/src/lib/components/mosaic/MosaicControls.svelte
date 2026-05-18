@@ -87,7 +87,7 @@
 	h1 {
 		max-width: 12ch;
 		color: #111827;
-		font-size: clamp(2rem, 5vw, 3.5rem);
+		font-size: clamp(2rem, 5vw, 0.1rem);
 		line-height: 0.98;
 		letter-spacing: 0;
 	}

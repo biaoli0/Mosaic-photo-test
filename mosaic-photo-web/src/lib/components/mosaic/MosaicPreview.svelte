@@ -9,6 +9,8 @@
 		errorState: MosaicError | null;
 		progressLabel: string;
 		hasImage: boolean;
+		canDownloadMosaic: boolean;
+		onDownload: () => void | Promise<void>;
 		onFileDrop: (file: File) => void | Promise<void>;
 	};
 
@@ -18,6 +20,8 @@
 		errorState,
 		progressLabel,
 		hasImage,
+		canDownloadMosaic,
+		onDownload,
 		onFileDrop
 	}: Props = $props();
 </script>
@@ -36,13 +40,23 @@
 				<p class="eyebrow">Preview</p>
 				<h2>Mosaic output</h2>
 			</div>
-			{#if processing && !errorState}
-				<span class="status-pill">Processing</span>
-			{:else if hasImage}
-				<span class="status-pill status-pill--ready">Ready</span>
-			{:else}
-				<span class="status-pill">Empty</span>
-			{/if}
+			<div class="preview-actions">
+				{#if processing && !errorState}
+					<span class="status-pill">Processing</span>
+				{:else if hasImage}
+					<span class="status-pill status-pill--ready">Ready</span>
+				{:else}
+					<span class="status-pill">Empty</span>
+				{/if}
+				<button
+					class="download-button"
+					type="button"
+					disabled={!canDownloadMosaic}
+					onclick={() => void onDownload()}
+				>
+					Download
+				</button>
+			</div>
 		</div>
 
 		<div class="mosaic-frame" class:has-image={hasImage}>
@@ -101,6 +115,14 @@
 		border-bottom: 1px solid #edf1f6;
 	}
 
+	.preview-actions {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+	}
+
 	.eyebrow {
 		margin: 0 0 0.35rem;
 		color: #2563eb;
@@ -132,6 +154,35 @@
 		border-color: #b8e3d6;
 		background: #ecfdf5;
 		color: #047857;
+	}
+
+	.download-button {
+		min-height: 2.15rem;
+		border: 1px solid #1d4ed8;
+		border-radius: 0.4rem;
+		background: #2563eb;
+		color: #ffffff;
+		padding: 0.35rem 0.75rem;
+		font-size: 0.82rem;
+		font-weight: 800;
+		white-space: nowrap;
+		cursor: pointer;
+		transition:
+			background 120ms ease,
+			border-color 120ms ease,
+			box-shadow 120ms ease;
+	}
+
+	.download-button:hover:not(:disabled) {
+		background: #1d4ed8;
+		box-shadow: 0 0.45rem 1rem rgba(37, 99, 235, 0.18);
+	}
+
+	.download-button:disabled {
+		border-color: #d7deea;
+		background: #eef2f7;
+		color: #94a3b8;
+		cursor: not-allowed;
 	}
 
 	canvas {
@@ -280,6 +331,11 @@
 		.preview-toolbar {
 			align-items: flex-start;
 			flex-direction: column;
+		}
+
+		.preview-actions {
+			justify-content: flex-start;
+			width: 100%;
 		}
 
 		.preview-panel {
