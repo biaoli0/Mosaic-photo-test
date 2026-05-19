@@ -5,7 +5,8 @@ Express backend for mosaic image processing. Decoupled from the SvelteKit fronte
 ## Endpoints
 
 - `GET /health` &mdash; liveness probe, returns `{ "status": "ok" }`.
-- `POST /mosaic?tileSize=<int>` &mdash; accepts an image binary (`Content-Type: image/png` typical), returns a PNG of the same dimensions with the mosaic effect applied. `tileSize` must be an integer in `[2, 256]`. The body is capped at 12 MB.
+- `GET /settings` &mdash; returns the active client-relevant limits: `tileSize.min`, `tileSize.max`, and `maxBodyBytes`.
+- `POST /mosaic?tileSize=<int>` &mdash; accepts an image binary (`Content-Type: image/png` typical), returns a PNG of the same dimensions with the mosaic effect applied. `tileSize` must be within the configured bounds. The body is capped by `MAX_BODY_BYTES` (default `20 MiB`); `GET /settings` exposes the active byte limit.
 
 ## Prerequisites
 
@@ -33,11 +34,14 @@ Compiled JavaScript is written to `dist/`.
 
 ## Configuration
 
-| Env var       | Default                    | Notes                                                       |
-| ------------- | -------------------------- | ----------------------------------------------------------- |
-| `PORT`        | `3001`                     | TCP port to listen on.                                      |
-| `HOST`        | `0.0.0.0`                  | Bind address.                                               |
-| `CORS_ORIGIN` | `*` (any origin permitted) | Lock down to your frontend origin in production, e.g. `https://mosaic.example.com`. |
+| Env var          | Default                    | Notes                                                                               |
+| ---------------- | -------------------------- | ----------------------------------------------------------------------------------- |
+| `PORT`           | `3001`                     | TCP port to listen on.                                                              |
+| `HOST`           | `0.0.0.0`                  | Bind address.                                                                       |
+| `CORS_ORIGIN`    | `*` (any origin permitted) | Lock down to your frontend origin in production, e.g. `https://mosaic.example.com`. |
+| `MAX_BODY_BYTES` | `20971520`                 | Max raw image upload size in bytes.                                                 |
+| `MIN_TILE_SIZE`  | `2`                        | Minimum accepted `tileSize`.                                                        |
+| `MAX_TILE_SIZE`  | `256`                      | Maximum accepted `tileSize`.                                                        |
 
 ## Tests / type-checking
 

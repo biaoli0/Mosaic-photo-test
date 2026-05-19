@@ -23,11 +23,13 @@ npm run dev -- --open
 
 ## Configuration
 
-| Env var                    | Default                 | Notes                                                                                                                          |
-| -------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Env var                      | Default                 | Notes                                                                                                                        |
+| ---------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `VITE_MOSAIC_PHOTO_API_URL`  | `http://localhost:3001` | Resolved at build time. Must be set in the build environment for production. Vite-exposed env vars must be prefixed `VITE_`. |
+| `MOSAIC_CHUNK_TARGET_HEIGHT` | `1024`                  | Server-side UI tuning for chunk upload height.                                                                               |
+| `MOSAIC_CHUNK_CONCURRENCY`   | `4`                     | Server-side UI tuning for concurrent chunk uploads.                                                                          |
 
-A `.env.example` is checked in — copy it to `.env.local` if you need to override the default.
+A `.env.example` is checked in — copy it to `.env.local` if you need to override the default. Tile slider bounds are loaded from the API `GET /settings` endpoint; if the request fails, the web server uses the last valid response in memory, then local fallback bounds.
 
 ## Build
 

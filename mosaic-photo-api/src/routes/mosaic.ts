@@ -1,41 +1,26 @@
 import express, { Router, type Request, type Response, type NextFunction } from 'express';
 import sharp from 'sharp';
 import { applyMosaic } from '../mosaic';
+import { mosaicSettings } from '../settings';
 
-function parseEnvPositiveInt(name: string, defaultValue: number): number {
-	const raw = process.env[name];
-	if (raw === undefined || raw.trim() === '') return defaultValue;
-	const n = Number(raw);
-	if (!Number.isInteger(n) || n < 1) {
-		throw new Error(`Environment variable ${name} must be a positive integer, got: ${raw}`);
-	}
-	return n;
-}
-
-const MAX_BODY_BYTES = parseEnvPositiveInt('MAX_BODY_BYTES', 20 * 1024 * 1024);
-const MIN_TILE_SIZE = parseEnvPositiveInt('MIN_TILE_SIZE', 2);
-const MAX_TILE_SIZE = parseEnvPositiveInt('MAX_TILE_SIZE', 256);
-
-if (MIN_TILE_SIZE > MAX_TILE_SIZE) {
-	throw new Error(
-		`Invalid mosaic limits: MIN_TILE_SIZE (${MIN_TILE_SIZE}) cannot be greater than MAX_TILE_SIZE (${MAX_TILE_SIZE})`
-	);
-}
-
-const MAX_BODY_DESCRIPTION = MAX_BODY_BYTES / 1024 / 1024 + ' MB';
+const MAX_BODY_DESCRIPTION = mosaicSettings.maxBodyBytes / 1024 / 1024 + ' MB';
 
 export const mosaicRouter: Router = Router();
 
 // `express.raw` parses the body into a Buffer and enforces the size limit
-const rawImage = express.raw({ type: '*/*', limit: MAX_BODY_BYTES });
+const rawImage = express.raw({ type: '*/*', limit: mosaicSettings.maxBodyBytes });
 
 mosaicRouter.post('/', rawImage, async (req: Request, res: Response): Promise<void> => {
 	const tileSize = Number(req.query.tileSize ?? '');
-	if (!Number.isInteger(tileSize) || tileSize < MIN_TILE_SIZE || tileSize > MAX_TILE_SIZE) {
+	if (
+		!Number.isInteger(tileSize) ||
+		tileSize < mosaicSettings.tileSize.min ||
+		tileSize > mosaicSettings.tileSize.max
+	) {
 		res
 			.status(400)
 			.send(
-				`Invalid tileSize query parameter (must be an integer in [${MIN_TILE_SIZE}, ${MAX_TILE_SIZE}]).`
+				`Invalid tileSize query parameter (must be an integer in [${mosaicSettings.tileSize.min}, ${mosaicSettings.tileSize.max}]).`
 			);
 		return;
 	}
