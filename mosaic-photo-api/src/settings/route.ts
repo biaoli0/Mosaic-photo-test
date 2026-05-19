@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { mosaicSettings } from '../settings';
+import { mosaicSettings } from './settings';
 
 export const settingsRouter: Router = Router();
 
