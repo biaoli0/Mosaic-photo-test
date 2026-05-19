@@ -1,5 +1,8 @@
 import { DEFAULT_TILE_SLIDER_MAX, DEFAULT_TILE_SLIDER_MIN } from '$lib/mosaicChunkDefaults';
 
+const DEFAULT_MOSAIC_API_BASE_URL = 'http://localhost:3001';
+const SETTINGS_FETCH_TIMEOUT_MS = 1500;
+
 export type MosaicApiSettings = {
 	maxBodyBytes: number;
 	tileSize: {
@@ -55,11 +58,15 @@ export function resetMosaicApiSettingsCache(): void {
 }
 
 export async function loadMosaicApiSettings(
-	apiBaseUrl: string,
+	rawApiBaseUrl: string | undefined,
 	fetcher: typeof fetch = fetch
 ): Promise<MosaicApiSettings> {
+	const apiBaseUrl = (rawApiBaseUrl ?? DEFAULT_MOSAIC_API_BASE_URL).replace(/\/+$/, '');
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), SETTINGS_FETCH_TIMEOUT_MS);
+
 	try {
-		const response = await fetcher(new URL('/settings', apiBaseUrl));
+		const response = await fetcher(`${apiBaseUrl}/settings`, { signal: controller.signal });
 		if (!response.ok) throw new Error(`GET /settings returned ${response.status}`);
 
 		const parsed = parseMosaicApiSettings(await response.json());
@@ -71,5 +78,7 @@ export async function loadMosaicApiSettings(
 		const message = error instanceof Error ? error.message : 'Unknown settings fetch error';
 		console.warn(`Using fallback mosaic settings: ${message}`);
 		return cachedSettings ?? fallbackSettings;
+	} finally {
+		clearTimeout(timeout);
 	}
 }

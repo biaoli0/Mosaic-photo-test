@@ -24,8 +24,7 @@ export const load: PageServerLoad = async ({ fetch }) => {
 		DEFAULT_CHUNK_CONCURRENCY
 	);
 
-	const apiBaseUrl = env.VITE_MOSAIC_PHOTO_API_URL ?? 'http://localhost:3001';
-	const settings = await loadMosaicApiSettings(apiBaseUrl, fetch);
+	const settings = await loadMosaicApiSettings(import.meta.env.VITE_MOSAIC_PHOTO_API_URL, fetch);
 	const tileSliderMin = settings.tileSize.min;
 	const tileSliderMax = settings.tileSize.max;
 	const tileSizeDefault = Math.min(Math.max(DEFAULT_TILE_SIZE, tileSliderMin), tileSliderMax);

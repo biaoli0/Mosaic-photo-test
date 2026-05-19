@@ -8,10 +8,11 @@ import {
 afterEach(() => {
 	resetMosaicApiSettingsCache();
 	vi.restoreAllMocks();
+	vi.useRealTimers();
 });
 
 function mockFetchJson(body: unknown, ok = true, status = 200): typeof fetch {
-	return vi.fn(async () => ({
+	return vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => ({
 		ok,
 		status,
 		json: async () => body
@@ -53,7 +54,24 @@ describe('loadMosaicApiSettings', () => {
 			maxBodyBytes: 500,
 			tileSize: { min: 4, max: 40 }
 		});
-		expect(fetcher).toHaveBeenCalledWith(new URL('/settings', 'http://localhost:3001'));
+		expect(fetcher).toHaveBeenCalledWith(
+			'http://localhost:3001/settings',
+			expect.objectContaining({ signal: expect.any(AbortSignal) })
+		);
+	});
+
+	it('preserves API base URL path prefixes when fetching settings', async () => {
+		const fetcher = mockFetchJson({
+			maxBodyBytes: 500,
+			tileSize: { min: 4, max: 40 }
+		});
+
+		await loadMosaicApiSettings('https://example.com/api/', fetcher);
+
+		expect(fetcher).toHaveBeenCalledWith(
+			'https://example.com/api/settings',
+			expect.objectContaining({ signal: expect.any(AbortSignal) })
+		);
 	});
 
 	it('uses cached settings when the next response is malformed', async () => {
@@ -78,6 +96,27 @@ describe('loadMosaicApiSettings', () => {
 		await expect(
 			loadMosaicApiSettings('http://localhost:3001', mockFetchJson({}, false, 500))
 		).resolves.toEqual({
+			maxBodyBytes: 20 * 1024 * 1024,
+			tileSize: { min: 2, max: 256 }
+		});
+	});
+
+	it('uses local fallback settings when the settings request times out', async () => {
+		vi.useFakeTimers();
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const fetcher = vi.fn(
+			(_input: RequestInfo | URL, init?: RequestInit) =>
+				new Promise<Response>((_resolve, reject) => {
+					init?.signal?.addEventListener('abort', () =>
+						reject(new DOMException('The operation was aborted.', 'AbortError'))
+					);
+				})
+		) as unknown as typeof fetch;
+
+		const settings = loadMosaicApiSettings('http://localhost:3001', fetcher);
+		await vi.advanceTimersByTimeAsync(1500);
+
+		await expect(settings).resolves.toEqual({
 			maxBodyBytes: 20 * 1024 * 1024,
 			tileSize: { min: 2, max: 256 }
 		});
