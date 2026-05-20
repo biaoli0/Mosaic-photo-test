@@ -2,10 +2,9 @@ import { env } from '$env/dynamic/private';
 import {
 	DEFAULT_CHUNK_CONCURRENCY,
 	DEFAULT_CHUNK_TARGET_HEIGHT,
-	DEFAULT_TILE_SIZE,
-	DEFAULT_TILE_SLIDER_MAX,
-	DEFAULT_TILE_SLIDER_MIN
+	DEFAULT_TILE_SIZE
 } from '$lib/mosaicChunkDefaults';
+import { loadMosaicApiSettings } from '$lib/server/mosaicApiSettings';
 import type { PageServerLoad } from './$types';
 
 function parseEnvPositiveInt(raw: string | undefined, fallback: number): number {
@@ -15,7 +14,7 @@ function parseEnvPositiveInt(raw: string | undefined, fallback: number): number 
 	return n;
 }
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ fetch }) => {
 	const mosaicChunkTargetHeight = parseEnvPositiveInt(
 		env.MOSAIC_CHUNK_TARGET_HEIGHT,
 		DEFAULT_CHUNK_TARGET_HEIGHT
@@ -25,18 +24,9 @@ export const load: PageServerLoad = async () => {
 		DEFAULT_CHUNK_CONCURRENCY
 	);
 
-	let tileSliderMin = parseEnvPositiveInt(
-		env.MOSAIC_TILE_SLIDER_MIN,
-		DEFAULT_TILE_SLIDER_MIN
-	);
-	let tileSliderMax = parseEnvPositiveInt(
-		env.MOSAIC_TILE_SLIDER_MAX,
-		DEFAULT_TILE_SLIDER_MAX
-	);
-	if (tileSliderMin > tileSliderMax) {
-		tileSliderMin = DEFAULT_TILE_SLIDER_MIN;
-		tileSliderMax = DEFAULT_TILE_SLIDER_MAX;
-	}
+	const settings = await loadMosaicApiSettings(import.meta.env.VITE_MOSAIC_PHOTO_API_URL, fetch);
+	const tileSliderMin = settings.tileSize.min;
+	const tileSliderMax = settings.tileSize.max;
 	const tileSizeDefault = Math.min(Math.max(DEFAULT_TILE_SIZE, tileSliderMin), tileSliderMax);
 
 	return {
@@ -44,6 +34,7 @@ export const load: PageServerLoad = async () => {
 		mosaicChunkConcurrency,
 		tileSliderMin,
 		tileSliderMax,
-		tileSizeDefault
+		tileSizeDefault,
+		maxBodyBytes: settings.maxBodyBytes
 	};
 };

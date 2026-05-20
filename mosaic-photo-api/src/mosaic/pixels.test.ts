@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyMosaic } from './mosaic.ts';
+import { applyMosaic } from './pixels';
 
 /**
  * Creates a flat RGBA Uint8Array from a list of [R, G, B, A] values.

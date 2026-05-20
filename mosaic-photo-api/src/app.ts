@@ -1,6 +1,8 @@
 import express, { type Express } from 'express';
 import cors from 'cors';
-import { mosaicRouter, payloadTooLargeHandler } from './routes/mosaic';
+import { payloadTooLargeHandler } from './mosaic/errors';
+import { mosaicRouter } from './mosaic/route';
+import { settingsRouter } from './settings/route';
 
 export function createApp(): Express {
 	const app = express();
@@ -12,6 +14,7 @@ export function createApp(): Express {
 		res.json({ status: 'ok' });
 	});
 
+	app.use('/settings', settingsRouter);
 	app.use('/mosaic', mosaicRouter);
 
 	app.use(payloadTooLargeHandler);
